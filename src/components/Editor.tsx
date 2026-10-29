@@ -12,7 +12,7 @@ export default function Editor({
 }: {
   value: string;
   onChange: (v: string) => void;
-  language: "python" | "javascript";
+  language: "python" | "javascript" | "cpp";
   height?: number;
   onPaste?: (chars: number) => void;
 }) {

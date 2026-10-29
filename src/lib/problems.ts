@@ -18,6 +18,8 @@ export const PROBLEMS: Problem[] = [
     ],
     starterPy: "def two_sum(nums, target):\n    # your code here\n    pass\n",
     starterJs: "function twoSum(nums, target) {\n  // your code here\n}\n",
+    starterCpp: "#include <vector>\nusing namespace std;\n\nvector<int> two_sum(vector<int> nums, int target) {\n    // your code here\n    return {};\n}\n",
+    cppReturn: "vec",
     fnName: "two_sum",
     tests: [
       { input: "two_sum([2,7,11,15], 9)", expected: "[0, 1]" },
@@ -44,6 +46,8 @@ export const PROBLEMS: Problem[] = [
     ],
     starterPy: "def is_valid(s):\n    # your code here\n    pass\n",
     starterJs: "function isValid(s) {\n  // your code here\n}\n",
+    starterCpp: "#include <string>\nusing namespace std;\n\nbool is_valid(string s) {\n    // your code here\n    return false;\n}\n",
+    cppReturn: "bool",
     fnName: "is_valid",
     tests: [
       { input: 'is_valid("()[]{}")', expected: "True" },
@@ -67,6 +71,8 @@ export const PROBLEMS: Problem[] = [
     examples: [{ input: "[[1,3],[2,6],[8,10],[15,18]]", output: "[[1,6],[8,10],[15,18]]" }],
     starterPy: "def merge(intervals):\n    # your code here\n    pass\n",
     starterJs: "function merge(intervals) {\n  // your code here\n}\n",
+    starterCpp: "#include <vector>\nusing namespace std;\n\nvector<vector<int>> merge(vector<vector<int>> intervals) {\n    // your code here\n    return {};\n}\n",
+    cppReturn: "vecvec",
     fnName: "merge",
     tests: [
       { input: "merge([[1,3],[2,6],[8,10],[15,18]])", expected: "[[1, 6], [8, 10], [15, 18]]" },
@@ -89,6 +95,8 @@ export const PROBLEMS: Problem[] = [
     examples: [{ input: '["eat","tea","tan","ate","nat","bat"]', output: '[["bat"],["nat","tan"],["ate","eat","tea"]]' }],
     starterPy: "def group_anagrams(strs):\n    # your code here\n    pass\n",
     starterJs: "function groupAnagrams(strs) {\n  // your code here\n}\n",
+    starterCpp: "#include <string>\n#include <vector>\nusing namespace std;\n\nvector<vector<string>> group_anagrams(vector<string> strs) {\n    // your code here\n    return {};\n}\n",
+    cppReturn: "groups",
     fnName: "group_anagrams",
     tests: [
       { input: 'group_anagrams(["eat","tea","tan","ate","nat","bat"])', expected: "groups: bat | ate,eat,tea | nat,tan" },
@@ -111,6 +119,8 @@ export const PROBLEMS: Problem[] = [
     examples: [{ input: "nums = [1,1,1,2,2,3], k = 2", output: "[1,2]" }],
     starterPy: "def top_k_frequent(nums, k):\n    # your code here\n    pass\n",
     starterJs: "function topKFrequent(nums, k) {\n  // your code here\n}\n",
+    starterCpp: "#include <vector>\nusing namespace std;\n\nvector<int> top_k_frequent(vector<int> nums, int k) {\n    // your code here\n    return {};\n}\n",
+    cppReturn: "vec",
     fnName: "top_k_frequent",
     tests: [
       { input: "top_k_frequent([1,1,1,2,2,3], 2)", expected: "[1, 2]" },
@@ -133,6 +143,8 @@ export const PROBLEMS: Problem[] = [
     examples: [{ input: "nums = [4,5,6,7,0,1,2], target = 0", output: "4" }],
     starterPy: "def search(nums, target):\n    # your code here\n    pass\n",
     starterJs: "function search(nums, target) {\n  // your code here\n}\n",
+    starterCpp: "#include <vector>\nusing namespace std;\n\nint search(vector<int> nums, int target) {\n    // your code here\n    return -1;\n}\n",
+    cppReturn: "int",
     fnName: "search",
     tests: [
       { input: "search([4,5,6,7,0,1,2], 0)", expected: "4" },

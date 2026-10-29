@@ -10,7 +10,7 @@ import { Play, ShieldCheck, Timer, ClipboardPaste, AlertTriangle } from "lucide-
 
 export default function SolveClient({ id }: { id: string }) {
   const problem = getProblem(id);
-  const [lang, setLang] = useState<"python" | "javascript">("python");
+  const [lang, setLang] = useState<"python" | "javascript" | "c++">("python");
   const [code, setCode] = useState(() => problem?.starterPy ?? "");
   const [results, setResults] = useState<RunResult[] | null>(null);
   const [running, setRunning] = useState(false);
@@ -38,9 +38,9 @@ export default function SolveClient({ id }: { id: string }) {
     return () => clearTimeout(t);
   }, [problem]);
 
-  function switchLang(next: "python" | "javascript") {
+  function switchLang(next: "python" | "javascript" | "c++") {
     setLang(next);
-    if (problem) setCode(next === "python" ? problem.starterPy : problem.starterJs);
+    if (problem) setCode(next === "python" ? problem.starterPy : next === "c++" ? problem.starterCpp : problem.starterJs);
   }
 
   const visiblePassed = useMemo(() => {
@@ -54,7 +54,7 @@ export default function SolveClient({ id }: { id: string }) {
     if (!problem) return;
     setRunning(true); setRunError("");
     try {
-      const out = await runTests({ language: lang, code, fnName: problem.fnName, tests: problem.tests });
+      const out = await runTests({ language: lang, code, fnName: problem.fnName, tests: problem.tests, problemId: problem.id });
       if (out.error) setRunError(out.error);
       setResults(out.results);
     } catch (e) {
@@ -146,10 +146,11 @@ export default function SolveClient({ id }: { id: string }) {
             <>
               <div className="flex items-center gap-2 font-ui text-sm">
                 <button onClick={() => switchLang("python")} className={`px-3 py-1.5 rounded-md border ${lang === "python" ? "bg-[#e8b33d] text-black font-semibold border-transparent" : "border-[#3a3c37]"}`}>Python</button>
+                <button onClick={() => switchLang("c++")} className={`px-3 py-1.5 rounded-md border ${lang === "c++" ? "bg-[#e8b33d] text-black font-semibold border-transparent" : "border-[#3a3c37]"}`}>C++</button>
                 <button onClick={() => switchLang("javascript")} className={`px-3 py-1.5 rounded-md border ${lang === "javascript" ? "bg-[#e8b33d] text-black font-semibold border-transparent" : "border-[#3a3c37]"}`}>JavaScript</button>
                 <span className="text-xs text-[#8a877d] ml-auto">fn: <span className="font-code">{problem.fnName}</span></span>
               </div>
-              <div className="mt-3"><Editor value={code} onChange={setCode} language={lang} onPaste={(n) => setPasteChars((p) => p + n)} /></div>
+              <div className="mt-3"><Editor value={code} onChange={setCode} language={lang === "c++" ? "cpp" : lang} onPaste={(n) => setPasteChars((p) => p + n)} /></div>
               <div className="mt-3 flex flex-wrap gap-3 font-ui">
                 <button onClick={doRun} disabled={running} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-white text-black font-semibold text-sm disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Running…" : "Run tests"}</button>
                 <button onClick={startDefend} disabled={!visiblePassed || Boolean(lockedMsg)} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-[#e8b33d] text-black font-semibold text-sm disabled:opacity-40"><ShieldCheck className="h-4 w-4" /> Defend your solution (3 × {problem.defendSeconds}s)</button>

@@ -9,10 +9,11 @@ export interface RunResult {
 }
 
 export async function runTests(args: {
-  language: "python" | "javascript";
+  language: "python" | "javascript" | "c++";
   code: string;
   fnName: string;
   tests: TestCase[];
+  problemId?: string;
 }): Promise<{ results: RunResult[]; error?: string; engine: string }> {
   const res = await fetch("/api/run", {
     method: "POST",

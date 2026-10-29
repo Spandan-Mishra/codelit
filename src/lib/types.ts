@@ -20,6 +20,8 @@ export interface Problem {
   examples: { input: string; output: string; note?: string }[];
   starterPy: string;
   starterJs: string;
+  starterCpp: string;
+  cppReturn: "vec" | "vecvec" | "bool" | "int" | "groups";
   fnName: string;
   tests: TestCase[];
   hints: string[];
