@@ -15,6 +15,20 @@ npm run dev    # http://localhost:3000
 
 Production: `npm run build && npm run start -- -p 3000`
 
+## Deploy
+
+Serverless platforms can't compile C++ or guarantee `python3`, so deploy
+the container (Render, Fly.io, Railway, or any VM):
+
+```bash
+docker build -t codelit .
+docker run -p 3000:3000 -e MODEL_API_KEY=... codelit
+```
+
+Set `MODEL_API_KEY` for live interrogation (optional — the offline
+interrogator works without it). Rate limits are in-memory per instance;
+front them with the platform's own throttling if traffic grows.
+
 ## Live interrogation (optional — works offline without it)
 
 Copy `.env.example` to `.env.local` and set `MODEL_API_KEY`.

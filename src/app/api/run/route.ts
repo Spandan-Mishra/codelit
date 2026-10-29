@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { outputsMatch } from "@/lib/runner";
 import { getProblem } from "@/lib/problems";
+import { limited, clientIp } from "@/lib/ratelimit";
 import type { TestCase } from "@/lib/types";
 
 function toCamel(s: string) {
@@ -109,7 +110,14 @@ export async function POST(req: Request) {
     tests: TestCase[];
     problemId?: string;
   };
+  // Code execution is the abuse-sensitive path: cap volume and payload size.
+  if (limited(`run:${clientIp(req)}`, 30)) {
+    return NextResponse.json({ results: [], error: "Rate limited — wait a minute.", engine: "limited" }, { status: 429 });
+  }
   if (!code || !fnName || !Array.isArray(tests)) return NextResponse.json({ results: [], error: "Missing code/tests", engine: "none" }, { status: 400 });
+  if (code.length > 20_000 || tests.length > 10) {
+    return NextResponse.json({ results: [], error: "Payload too large (max 20k code chars, 10 tests).", engine: "none" }, { status: 413 });
+  }
   try {
     if (language === "javascript") return NextResponse.json({ results: runJs(code, fnName, tests), engine: "local-js" });
     if (language === "c++") {
