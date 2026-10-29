@@ -26,8 +26,14 @@ export async function runTests(args: {
 }
 
 export function normalize(s: string): string {
-  return s.trim().replace(/\s+/g, " ").replace(/'/g, '"').toLowerCase();
+  // Case is significant (error codes, strings); only collapse quoting noise.
+  return s.trim().replace(/\s+/g, " ").replace(/'/g, '"');
 }
+
+// Tasks whose correct result is a SET, not a sequence: index pairs and
+// frequency ranks read the same in any order. Everything else compares
+// exactly — schedules, rows, and allocations must not be sortable into a pass.
+const UNORDERED_TASKS = new Set(["two_sum", "top_k_frequent"]);
 
 export function outputsMatch(actual: string, expected: string, fnName: string): boolean {
   const a = normalize(actual);
@@ -49,7 +55,13 @@ export function outputsMatch(actual: string, expected: string, fnName: string): 
     const sortDeep = (v: unknown): unknown =>
       Array.isArray(v) ? v.map(sortDeep).sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y))) : v;
     if (fnName.includes("group")) return JSON.stringify(sortDeep(pa)) === JSON.stringify(sortDeep(pe));
-    if (Array.isArray(pa) && Array.isArray(pe) && pa.length === pe.length && typeof pa[0] === "number")
+    if (
+      UNORDERED_TASKS.has(fnName) &&
+      Array.isArray(pa) &&
+      Array.isArray(pe) &&
+      pa.length === pe.length &&
+      typeof pa[0] === "number"
+    )
       return JSON.stringify([...pa].sort((x, y) => x - y)) === JSON.stringify([...pe].sort((x, y) => x - y));
     return JSON.stringify(pa) === JSON.stringify(pe);
   } catch {

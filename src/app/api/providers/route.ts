@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProvider, type ProviderId } from "@/lib/agents";
 import { limited, clientIp } from "@/lib/ratelimit";
+import { checkEgress, redirectRefused } from "@/lib/egress";
 
 const TIMEOUT_MS = 12_000;
 
@@ -52,10 +53,16 @@ export async function POST(req: Request) {
   if (def.needsKey && !key) {
     return NextResponse.json({ ok: false, message: "API key required.", latencyMs: 0 }, { status: 400 });
   }
+  // Same egress policy as the proxy: public https only, no redirects.
+  const egress = await checkEgress(base);
+  if (!egress.ok) {
+    return NextResponse.json({ ok: false, message: egress.error, latencyMs: 0 }, { status: 400 });
+  }
 
   try {
     if (provider === "ollama") {
-      const { out: res, ms } = await timed((signal) => fetch(`${base}/api/tags`, { signal }));
+      const { out: res, ms } = await timed((signal) => fetch(`${base}/api/tags`, { signal, redirect: "manual" }));
+      if (res.status >= 300 && res.status < 400) return fail(redirectRefused(def.label), ms);
       if (!res.ok) return fail(`Ollama error (HTTP ${res.status}).`, ms);
       const data = (await res.json()) as { models?: { name?: string }[] };
       const models = (data.models || []).map((m) => m.name || "").filter(Boolean);
@@ -67,6 +74,7 @@ export async function POST(req: Request) {
         fetch(`${base}/v1/messages`, {
           method: "POST",
           signal,
+          redirect: "manual",
           headers: {
             "Content-Type": "application/json",
             "x-api-key": key,
@@ -75,22 +83,25 @@ export async function POST(req: Request) {
           body: JSON.stringify({ model: def.defaultModel, max_tokens: 1, messages: [{ role: "user", content: "hi" }] }),
         })
       );
+      if (res.status >= 300 && res.status < 400) return fail(redirectRefused(def.label), ms);
       if (res.status === 401) return fail("Invalid key.", ms);
       if (!res.ok) return fail(`Anthropic error (HTTP ${res.status}).`, ms);
       return NextResponse.json({ ok: true, message: "Anthropic key works.", latencyMs: ms });
     }
     if (provider === "google") {
       const { out: res, ms } = await timed((signal) =>
-        fetch(`${base}/models?key=${encodeURIComponent(key)}`, { signal })
+        fetch(`${base}/models?key=${encodeURIComponent(key)}`, { signal, redirect: "manual" })
       );
+      if (res.status >= 300 && res.status < 400) return fail(redirectRefused(def.label), ms);
       if (res.status === 400 || res.status === 403) return fail("Invalid key.", ms);
       if (!res.ok) return fail(`Google error (HTTP ${res.status}).`, ms);
       return NextResponse.json({ ok: true, message: "Google key works.", latencyMs: ms });
     }
     // OpenAI-compatible: openai, openrouter, meta — GET {base}/models.
     const { out: res, ms } = await timed((signal) =>
-      fetch(`${base}/models`, { signal, headers: { Authorization: `Bearer ${key}` } })
+      fetch(`${base}/models`, { signal, redirect: "manual", headers: { Authorization: `Bearer ${key}` } })
     );
+    if (res.status >= 300 && res.status < 400) return fail(redirectRefused(def.label), ms);
     if (res.status === 401) return fail("Invalid key.", ms);
     if (!res.ok) return fail(`${def.label} error (HTTP ${res.status}).`, ms);
     let models: string[] | undefined;

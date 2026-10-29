@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getProvider } from "@/lib/agents";
 import { limited, clientIp } from "@/lib/ratelimit";
+import { checkEgress, redirectRefused } from "@/lib/egress";
 
 const MAX_SYSTEM = 2000;
 const MAX_USER = 6000;
@@ -100,6 +101,10 @@ export async function POST(req: Request) {
   if (def.needsKey && !key) return NextResponse.json({ error: "API key required." }, { status: 400 });
   const base = baseOf(body.baseUrl, def.defaultBaseUrl);
   const model = typeof body.model === "string" && body.model.trim() ? body.model.trim().slice(0, 100) : def.defaultModel;
+  // User-supplied destinations stay on public https; redirects are refused
+  // below so a benign hostname cannot bounce the request (and key) inward.
+  const egress = await checkEgress(base);
+  if (!egress.ok) return NextResponse.json({ error: egress.error }, { status: 400 });
 
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -109,6 +114,7 @@ export async function POST(req: Request) {
       res = await fetch(`${base}/v1/messages`, {
         method: "POST",
         signal: ctrl.signal,
+        redirect: "manual",
         headers: {
           "Content-Type": "application/json",
           "x-api-key": key,
@@ -121,6 +127,8 @@ export async function POST(req: Request) {
           messages: [{ role: "user", content: user }],
         }),
       });
+      if (res.status >= 300 && res.status < 400)
+        return NextResponse.json({ error: redirectRefused(def.label) }, { status: 502 });
       if (res.status === 401) return NextResponse.json({ error: "Invalid key." }, { status: 401 });
       if (!res.ok) return NextResponse.json({ error: `Anthropic error (HTTP ${res.status}).` }, { status: 502 });
       const data = await res.json();
@@ -133,6 +141,7 @@ export async function POST(req: Request) {
         {
           method: "POST",
           signal: ctrl.signal,
+          redirect: "manual",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...(system ? { system_instruction: { parts: [{ text: system }] } } : {}),
@@ -141,6 +150,8 @@ export async function POST(req: Request) {
           }),
         }
       );
+      if (res.status >= 300 && res.status < 400)
+        return NextResponse.json({ error: redirectRefused(def.label) }, { status: 502 });
       if (res.status === 400 || res.status === 403) return NextResponse.json({ error: "Invalid key." }, { status: 401 });
       if (!res.ok) return NextResponse.json({ error: `Google error (HTTP ${res.status}).` }, { status: 502 });
       const data = await res.json();
@@ -152,6 +163,7 @@ export async function POST(req: Request) {
     res = await fetch(`${base}${path}`, {
       method: "POST",
       signal: ctrl.signal,
+      redirect: "manual",
       headers: {
         "Content-Type": "application/json",
         ...(key ? { Authorization: `Bearer ${key}` } : {}),
@@ -166,6 +178,8 @@ export async function POST(req: Request) {
         temperature: 0.4,
       }),
     });
+    if (res.status >= 300 && res.status < 400)
+      return NextResponse.json({ error: redirectRefused(def.label) }, { status: 502 });
     if (res.status === 401) return NextResponse.json({ error: "Invalid key." }, { status: 401 });
     if (!res.ok) {
       if (provider === "ollama" && res.status === 404) {

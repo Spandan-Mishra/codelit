@@ -38,18 +38,32 @@ function execTimeout(cmd: string, args: string[], opts: { timeout: number; cwd?:
 // Python: candidate code lives in its own module file, the driver imports it.
 // Appended test lines can never be swallowed by unfinished brackets/strings
 // in the candidate, which was the IndentationError source.
+// The trusted channel is marker lines (@@i@@ + repr of the RETURN value).
+// Candidate prints — import-time noise, debug lines — are swallowed by
+// redirect_stdout (discarded) and can no longer shift answers across tests.
+// Last marker wins, so stray prints never shadow the real result. Residual:
+// a deliberately hostile module can still escape redirect_stdout (raw fd
+// writes, atexit); closing that needs an isolated harness (P0-1 track).
 export async function runPython(code: string, fnName: string, tests: TestCase[]): Promise<ExecResult[]> {
   const normalized = code.replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").replace(/\s+$/, "") + "\n";
   const dir = await mkdtemp(join(tmpdir(), "codelit-py-"));
   try {
     await writeFile(join(dir, "solution.py"), normalized);
     const calls = tests
-      .map((t) => `try:\n    print(repr(solution.${t.input}), flush=True)\nexcept Exception as e:\n    print("ERROR: " + str(e), flush=True)`)
+      .map(
+        (t, i) =>
+          `try:\n    _buf=io.StringIO()\n    with contextlib.redirect_stdout(_buf):\n        _r=solution.${t.input}\n    print("@@${i}@@" + repr(_r), flush=True)\nexcept Exception as e:\n    print("@@${i}@@ERROR: " + str(e), flush=True)`
+      )
       .join("\n");
-    const { stdout } = await execTimeout("python3", ["-c", `import solution\n${calls}`], { timeout: 8000, cwd: dir });
+    const { stdout } = await execTimeout("python3", ["-c", `import solution, io, contextlib\n${calls}`], {
+      timeout: 8000,
+      cwd: dir,
+    });
     const lines = stdout.split("\n");
     return tests.map((t, i) => {
-      const actual = (lines[i] ?? "").trim();
+      const tag = `@@${i}@@`;
+      const line = [...lines].reverse().find((l) => l.startsWith(tag)) ?? "";
+      const actual = line.slice(tag.length).trim();
       return { input: t.input, expected: t.expected, actual, passed: outputsMatch(actual, t.expected, fnName), hidden: t.hidden };
     });
   } finally {
@@ -80,11 +94,17 @@ export async function runCpp(code: string, fnName: string, tests: TestCase[], re
     ret === "vecvec" ? "pvecvec" : ret === "int" ? "to_string" : ret === "groups" ? "pgroups" : ret === "str" ? "pstr" : "pvec";
   const dir = await mkdtemp(join(tmpdir(), "codelit-cpp-"));
   try {
+    // Marker-prefixed answer lines (@@i@@value); innocent debug prints land
+    // on other lines and no longer shift answers across tests. Last marker
+    // wins. Residual: a hostile binary can print fake markers — closing that
+    // needs an isolated harness (P0-1 track).
     const calls = tests
-      .map((t) => {
+      .map((t, i) => {
         const expr = pyExprToCpp(t.input);
         const call = ret === "bool" ? `(${expr} ? string("True") : string("False"))` : `${printer}(${expr})`;
-        return `try{cout<<${call}<<endl;}catch(...){cout<<"ERROR: exception"<<endl;}`;
+        // Value first into a temp, THEN the tag+value on one atomic line: a
+        // noisy callee's prints land on earlier lines, never inside ours.
+        return `try{string _a${i}=${call};cout<<"@@${i}@@"<<_a${i}<<endl;}catch(...){cout<<"@@${i}@@ERROR: exception"<<endl;}`;
       })
       .join("\n");
     await writeFile(join(dir, "solution.cpp"), `${CPP_PRELUDE}${code}\nint main(){${calls}return 0;}\n`);
@@ -92,7 +112,9 @@ export async function runCpp(code: string, fnName: string, tests: TestCase[], re
     const { stdout } = await execTimeout("./sol", [], { timeout: 5000, cwd: dir });
     const lines = stdout.split("\n");
     return tests.map((t, i) => {
-      const actual = (lines[i] ?? "").trim();
+      const tag = `@@${i}@@`;
+      const line = [...lines].reverse().find((l) => l.startsWith(tag)) ?? "";
+      const actual = line.slice(tag.length).trim();
       return { input: t.input, expected: t.expected, actual, passed: outputsMatch(actual, t.expected, fnName), hidden: t.hidden };
     });
   } finally {
