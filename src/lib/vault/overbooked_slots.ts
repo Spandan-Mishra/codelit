@@ -86,7 +86,7 @@ export function generateOverbookedSlots(seed: number): { briefs: [string, string
   const briefs: [string, string, string] = [
     `The ${team} team shares rooms with capacity ${capacity}, and too many meetings got double-booked. Implement overbooked_slots(starts, ends, capacity): given parallel lists of meeting start and end times, return the indices of the meetings that push occupancy over capacity. Sweep events in time order with ends before starts at equal times, and flag a meeting when the occupancy at its start, itself included, exceeds ${capacity}. Sample: overbooked_slots(${fmtCompact(d0.starts)}, ${fmtCompact(d0.ends)}, ${capacity}) -> ${fmtSpaced(overbookedSlotsRef(d0.starts, d0.ends, capacity))}.`,
     `Edge days: a back-to-back chain like ${fmtCompact(d1.starts)} reuses the room at every touch, so nothing is overbooked. A fully overlapping block of ${n2} meetings must flag exactly ${n2 - capacity} of them. Report flagged indices in sweep order.`,
-    `Final gate: hidden full-day calendars run at finish, mixing chains, pileups, and boundary touches. No new visible tests — defend what you built.`,
+    `Full-day calendars mixing chains, pileups, and touches. Ends free capacity before touching starts claim it; report flagged indices in sweep order.`,
   ];
   return { briefs, tests };
 }

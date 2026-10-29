@@ -49,7 +49,7 @@ interface FinishData {
 
 interface TraceEventOut {
   t: number;
-  kind: "prompt" | "code" | "run" | "stage" | "hint";
+  kind: "prompt" | "reply" | "code" | "run" | "stage" | "hint";
   text?: string;
   passed?: boolean;
   linesChanged?: number;
@@ -118,16 +118,13 @@ export default function AgentClient(props: {
   const [code, setCode] = useState(() => starterFor("python", fnName, stubs));
   const lastSnapshot = useRef("");
 
-  const [promptDraft, setPromptDraft] = useState("");
   const [prompts, setPrompts] = useState<string[]>([]);
-  const [loggingPrompt, setLoggingPrompt] = useState(false);
 
-  const [assistOpen, setAssistOpen] = useState(false);
+  const [assistOpen, setAssistOpen] = useState(true);
   const [assistLoading, setAssistLoading] = useState(false);
   const [assistReply, setAssistReply] = useState("");
   const [assistEngine, setAssistEngine] = useState("");
   const [assistError, setAssistError] = useState("");
-  const [assistPrompt, setAssistPrompt] = useState("");
   const [assistLabel, setAssistLabel] = useState("House Agent (free)");
   const [assistInput, setAssistInput] = useState("");
   const [assistHistory, setAssistHistory] = useState<{ role: "you" | "agent"; text: string }[]>([]);
@@ -214,21 +211,6 @@ export default function AgentClient(props: {
     setCode(starterFor(next, fnName, stubs));
   }
 
-  async function logPrompt() {
-    const text = promptDraft.trim();
-    if (!text || loggingPrompt) return;
-    setLoggingPrompt(true);
-    setNotice("");
-    const r = await sendEvent({ t: nowT(), kind: "prompt", text: text.slice(0, 4000) });
-    setLoggingPrompt(false);
-    if (!r.ok) {
-      setNotice(r.error);
-      return;
-    }
-    setPrompts((p) => [...p, text]);
-    setPromptDraft("");
-  }
-
   function toggleAssist() {
     if (!assistOpen) {
       const cfg = getAgentConfig();
@@ -262,7 +244,6 @@ export default function AgentClient(props: {
           ? `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}\nMy question: ${typed}`
           : `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}`
       ).slice(0, 5500);
-      setAssistPrompt(user);
       if (typed) setAssistHistory((h) => [...h, { role: "you", text: typed }]);
       setAssistInput("");
       const res = await fetch("/api/agent-proxy", {
@@ -286,17 +267,18 @@ export default function AgentClient(props: {
       setAssistReply(replyText);
       if (replyText) setAssistHistory((h) => [...h, { role: "agent", text: replyText }]);
       setAssistEngine(typeof data.engine === "string" ? data.engine : "");
+      const pev = await sendEvent({ t: nowT(), kind: "prompt", text: user.slice(0, 4000) });
+      if (!pev.ok) {
+        setNotice(`Prompt NOT captured: ${pev.error} — it does not count toward your trace.`);
+      } else {
+        setPrompts((p) => [...p, user]);
+        if (replyText) await sendEvent({ t: nowT(), kind: "reply", text: replyText.slice(0, 4000) });
+      }
     } catch (e) {
       setAssistError(e instanceof Error ? e.message : String(e));
     } finally {
       setAssistLoading(false);
     }
-  }
-
-  function logAssistPrompt() {
-    if (!assistPrompt) return;
-    setPromptDraft(assistPrompt);
-    setNotice("Assist prompt loaded into the prompt draft above — log it to count it.");
   }
 
   async function doRun() {
@@ -529,12 +511,12 @@ export default function AgentClient(props: {
       )}
       <ol className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 font-ui text-xs text-[#9a968c]">
         <li><span className="font-code text-[#e8b33d]">1</span> Chat with your agent below</li>
-        <li><span className="font-code text-[#e8b33d]">2</span> Log each prompt — it counts</li>
+        <li><span className="font-code text-[#e8b33d]">2</span> Prompts auto-captured as you chat</li>
         <li><span className="font-code text-[#e8b33d]">3</span> Code, run tests, submit stages</li>
         <li><span className="font-code text-[#e8b33d]">4</span> Finish, then defend your trace</li>
       </ol>
 
-      <div className="mt-6 grid lg:grid-cols-[0.9fr_1.1fr] gap-6 items-start">
+      <div className="mt-6 grid gap-6 items-start lg:grid-cols-2 xl:grid-cols-[0.95fr_1fr_1.05fr]">
         <div className="rounded-lg border border-[#262824] bg-[#141613] p-5">
           <p className="font-ui text-xs tracking-[0.18em] text-[#9a968c]">STAGE {stageUnlocked} / {TOTAL_STAGES}</p>
           <div className="mt-3 space-y-3">
@@ -569,34 +551,6 @@ export default function AgentClient(props: {
 
         <div>
           {phase === "code" && (
-            <>
-              <div className="rounded-lg border border-[#262824] bg-[#141613] p-5">
-                <div className="flex items-center justify-between font-ui text-sm">
-                  <span className="font-semibold">Prompt log</span>
-                  <span className="font-code text-xs text-[#9a968c]">{prompts.length} / {PROMPT_BUDGET} this session</span>
-                </div>
-                <p className="font-ui text-xs text-[#8a877d] mt-1.5 leading-5">Log the prompts you actually used — an empty trace caps your score and the defense will catch it.</p>
-                <textarea
-                  value={promptDraft}
-                  onChange={(e) => setPromptDraft(e.target.value)}
-                  rows={2}
-                  placeholder="Paste the prompt you just gave your agent…"
-                  className="mt-3 w-full rounded-md bg-black/50 border border-[#3a3c37] px-3 py-2.5 font-ui text-sm outline-none focus:border-[#e8b33d]"
-                />
-                <button onClick={() => void logPrompt()} disabled={loggingPrompt || !promptDraft.trim()} className="mt-2 font-ui px-4 py-2 rounded-md border border-[#3a3c37] text-sm disabled:opacity-40">
-                  {loggingPrompt ? "Logging…" : "Log this prompt"}
-                </button>
-                {prompts.length > 0 && (
-                  <ol className="mt-3 space-y-1.5 font-ui text-[13px] text-[#b9b5a9]">
-                    {prompts.map((p, i) => (
-                      <li key={i} className="rounded-md bg-black/40 border border-[#262824] px-3 py-2">
-                        <span className="text-[#8a877d]">#{i + 1}</span> {p.length > 160 ? `${p.slice(0, 160)}…` : p}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-
               <div className="mt-4 rounded-lg border border-[#262824] bg-[#141613] font-ui">
                 <button
                   onClick={toggleAssist}
@@ -604,7 +558,7 @@ export default function AgentClient(props: {
                   className="w-full flex items-center gap-2 px-5 py-3.5 text-sm font-semibold text-left"
                 >
                   <Bot className="h-4 w-4 text-[#e8b33d]" />
-                  Ask my agent
+                  Agent chat
                   <span className="font-normal text-xs text-[#8a877d]">· {assistLabel}</span>
                   <ChevronDown className={`h-4 w-4 ml-auto text-[#9a968c] transition-transform ${assistOpen ? "rotate-180" : ""}`} />
                 </button>
@@ -644,12 +598,31 @@ export default function AgentClient(props: {
                         {assistLoading ? "Asking…" : "Send"}
                       </button>
                     </div>
-                    {assistPrompt && (
-                      <button onClick={logAssistPrompt} className="mt-2 px-3 py-1.5 rounded-md border border-[#3a3c37] text-xs">
-                        Log last prompt to trace
-                      </button>
-                    )}
+                    <p className="font-ui text-[11px] text-[#8a877d] mt-2">Every exchange above is already in your trace.</p>
                   </div>
+                )}
+              </div>
+
+          )}
+        </div>
+
+        <div>
+          {phase === "code" && (
+            <>
+              <div className="rounded-lg border border-[#262824] bg-[#141613] p-5">
+                <div className="flex items-center justify-between font-ui text-sm">
+                  <span className="font-semibold">Prompt log</span>
+                  <span className="font-code text-xs text-[#9a968c]">{prompts.length} / {PROMPT_BUDGET} this session</span>
+                </div>
+                <p className="font-ui text-xs text-[#8a877d] mt-1.5 leading-5">Captured automatically from the agent chat — what you send is what counts. An empty trace caps your score.</p>
+                {prompts.length > 0 && (
+                  <ol className="mt-3 space-y-1.5 font-ui text-[13px] text-[#b9b5a9]">
+                    {prompts.map((p, i) => (
+                      <li key={i} className="rounded-md bg-black/40 border border-[#262824] px-3 py-2">
+                        <span className="text-[#8a877d]">#{i + 1}</span> {p.length > 160 ? `${p.slice(0, 160)}…` : p}
+                      </li>
+                    ))}
+                  </ol>
                 )}
               </div>
 

@@ -76,7 +76,7 @@ export function generateMinRooms(seed: number): { briefs: [string, string, strin
   const briefs: [string, string, string] = [
     `The ${team} team books standups in shared rooms. Implement min_rooms(starts, ends): given parallel lists of meeting start and end times, return the fewest rooms that fit every meeting. A meeting that ends exactly when another starts can reuse the room. Sample: min_rooms(${fmtCompact(m0.starts)}, ${fmtCompact(m0.ends)}) -> ${minRoomsRef(m0.starts, m0.ends)}.`,
     `Edge days: a back-to-back chain like ${fmtCompact(m1.starts)} needs just one room, while a fully overlapping block needs one room per meeting. Sort both timelines before you sweep.`,
-    `Final gate: hidden full-day schedules run at finish, mixing chains, overlaps, and boundary touches. No new visible tests — defend what you built.`,
+    `Full-day schedules mixing chains, full overlaps, and boundary touches. A meeting that ends exactly when another starts frees its room first.`,
   ];
   return { briefs, tests };
 }

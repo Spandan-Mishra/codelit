@@ -12,7 +12,7 @@ export const MAX_STAGE_TEXT = 1_000;
 export const MAX_EVENTS = 200;
 export const MAX_T_SEC = 24 * 3600;
 
-const KINDS: TraceEventKind[] = ["prompt", "code", "run", "stage", "hint"];
+const KINDS: TraceEventKind[] = ["prompt", "reply", "code", "run", "stage", "hint"];
 
 export function countKind(events: TraceEvent[], kind: TraceEventKind): number {
   return events.filter((e) => e.kind === kind).length;
@@ -40,7 +40,7 @@ export function validateEvent(attempt: AgentAttempt, event: TraceEvent): Validat
   if (!KINDS.includes(event.kind)) return { ok: false, error: "Unknown event kind." };
 
   const len = event.text?.length ?? 0;
-  if (event.kind === "prompt" || event.kind === "hint") {
+  if (event.kind === "prompt" || event.kind === "reply" || event.kind === "hint") {
     if (len === 0 || len > MAX_PROMPT_TEXT) {
       return { ok: false, error: `Prompt/hint text must be 1..${MAX_PROMPT_TEXT} chars.` };
     }

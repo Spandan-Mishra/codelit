@@ -69,7 +69,7 @@ export function generateAllocateStock(seed: number): { briefs: [string, string, 
   const briefs: [string, string, string] = [
     `The ${store} warehouse has ${stock0} units on the shelf and a queue of orders to fill. Implement allocate_stock(orders, stock): walk the order quantities in sequence and return one 1 (fulfilled) or 0 (skipped) per order. An order ships only when its full quantity fits in the remaining stock, and skipped orders consume nothing. Sample: allocate_stock(${fmtCompact(orders0)}, ${stock0}) -> ${fmtSpaced(allocateStockRef(orders0, stock0))}.`,
     `Edge queues: exact-fit stock like allocate_stock(${fmtCompact(orders1)}, ${stock1}) fulfills everything, while a pile of ${stock2} against oversized orders fulfills nothing. A skipped order never blocks a later smaller one that still fits.`,
-    `Final gate: hidden order queues run at finish, with longer lines and tighter piles. No new visible tests — defend what you built.`,
+    `Longer queues against tighter stock. Skipped orders consume nothing and never block a later order that still fits.`,
   ];
   return { briefs, tests };
 }

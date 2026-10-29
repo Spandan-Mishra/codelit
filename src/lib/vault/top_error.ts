@@ -62,7 +62,7 @@ export function generateTopError(seed: number): { briefs: [string, string, strin
   const briefs: [string, string, string] = [
     `You are on call for the ${service} service and its log page is full of failures. Implement top_error(codes): given the list of error code strings, return the code that appears most often. When two codes tie for the top count, return the lexicographically smallest one. Sample: top_error(${fmtCodes(sample)}) -> ${fmtStr(topErrorRef(sample))}.`,
     `Edge pages: an exact tie such as ${fmtCodes(codes1)} must resolve to ${fmtStr(topErrorRef(codes1))}, while a page repeating one code like ${fmtCodes(codes2)} returns that code. Compare code strings with plain lexicographic order.`,
-    `Final gate: hidden log pages run at finish, with longer noisy pages and closer races. No new visible tests — defend what you built.`,
+    `Longer noisy pages with close races and multi-way ties. Ties always break to the lexicographically smallest code string.`,
   ];
   return { briefs, tests };
 }

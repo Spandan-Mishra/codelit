@@ -65,7 +65,7 @@ export function generateValidRows(seed: number): { briefs: [string, string, stri
   const briefs: [string, string, string] = [
     `The ${club} club collected parallel lists of signup ages and ZIP codes, and some rows are junk. Implement valid_rows(ages, zips): return the indices of rows where the age is between 18 and 99 and the ZIP is between 10000 and 99999, with all bounds inclusive. Return the indices in ascending order. Sample: valid_rows(${fmtCompact(ages0)}, ${fmtCompact(zips0)}) -> ${fmtSpaced(validRowsRef(ages0, zips0))}.`,
     `Edge sheets: the boundary rows ${fmtCompact(ages1)} against ${fmtCompact(zips1)} keep only indices ${fmtSpaced(validRowsRef(ages1, zips1))}, and an empty sheet returns an empty list. Ages like 17 or 100 and ZIPs like 9999 or 100000 are always rejected.`,
-    `Final gate: hidden signup sheets run at finish, with longer rosters and boundary-heavy rows. No new visible tests — defend what you built.`,
+    `Longer rosters packed with boundary ages and ZIPs. Bounds stay inclusive on both ends; return the kept indices in ascending order.`,
   ];
   return { briefs, tests };
 }

@@ -137,17 +137,17 @@ export const SCENARIOS: Scenario[] = [
     stages: [
       {
         title: "Core pair",
-        brief: "Implement two_sum(nums, target): return the indices of the two numbers that add up to target. Exactly one solution exists; the same element cannot be used twice. Pass the sample run to unlock the edge cases.",
+        brief: "Write two_sum(nums, target), which returns the indices of the two numbers that add up to target. Constraints: exactly one solution exists, and the same element cannot be used twice. Aim for a single pass.",
         unlockHint: "Run the sample — a passing run unlocks stage 2.",
       },
       {
         title: "Duplicates and the self-pair trap",
-        brief: "Extension: your map must not pair an element with itself. Handle duplicate values (e.g. [3, 3], target 6) and confirm the complement lookup runs before the insert, not after.",
+        brief: "Extend it: duplicate values like [3, 3] with target 6 must return [0, 1], never [0, 0]. Check the complement in your map before inserting the current element.",
         unlockHint: "A passing run here unlocks the hidden acceptance suite.",
       },
       {
         title: "Hidden acceptance",
-        brief: "Final gate: the full suite including hidden negative-number cases runs at finish. No new visible tests — defend what you built.",
+        brief: "Finish with negative numbers covered, e.g. [-1, -2, -3] with target -5 returns the last two indices.",
         unlockHint: "Finish to run the full acceptance suite.",
       },
     ],
@@ -175,17 +175,17 @@ export const SCENARIOS: Scenario[] = [
     stages: [
       {
         title: "Overlapping cover",
-        brief: "Implement merge(intervals): merge all overlapping intervals and return the non-overlapping cover sorted by start. Pass the sample run to unlock the edge cases.",
+        brief: "Write merge(intervals), which merges all overlapping [start, end] pairs and returns the non-overlapping cover sorted by start. Sort by start first, then sweep once.",
         unlockHint: "Run the sample — a passing run unlocks stage 2.",
       },
       {
         title: "Touching and unsorted input",
-        brief: "Extension: touching intervals ([1,4],[4,5]) merge, and the input arrives shuffled — sort by start before you sweep. A passing run unlocks the hidden acceptance suite.",
+        brief: "Extend it: touching intervals like [1,4] and [4,5] merge into [1,5], and the input can arrive in any order — sort it yourself before sweeping.",
         unlockHint: "Sort-then-sweep; a passing run here unlocks stage 3.",
       },
       {
         title: "Hidden acceptance",
-        brief: "Final gate: the full suite including hidden containment cases runs at finish. No new visible tests — defend what you built.",
+        brief: "Finish with containment covered, e.g. [[1,4],[0,4]] merges into [[0,4]].",
         unlockHint: "Finish to run the full acceptance suite.",
       },
     ],

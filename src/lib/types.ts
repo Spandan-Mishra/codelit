@@ -86,7 +86,7 @@ export interface Scenario {
   generate?: (seed: number) => { briefs: [string, string, string]; tests: TestCase[] };
 }
 
-export type TraceEventKind = "prompt" | "code" | "run" | "stage" | "hint";
+export type TraceEventKind = "prompt" | "reply" | "code" | "run" | "stage" | "hint";
 
 export interface TraceEvent {
   t: number; // seconds since attempt start

@@ -65,7 +65,7 @@ export function generateRateLimit(seed: number): { briefs: [string, string, stri
   const briefs: [string, string, string] = [
     `The ${service} API gateway allows ${capacity} requests per ${window}-second window. Implement rate_limit(timestamps, capacity, window): timestamps arrive in non-decreasing order, and you return one 1 (allowed) or 0 (denied) per request. A request at time t is allowed when fewer than ${capacity} already-allowed requests fall after t - ${window}. Sample: rate_limit(${fmtCompact(ts0)}, ${capacity}, ${window}) -> ${fmtSpaced(rateLimitRef(ts0, capacity, window))}.`,
     `Edge traffic: a burst of ${ts1.length} simultaneous requests must cap at ${capacity} allows, while requests spaced wider than the window (like ${fmtCompact(ts2)}) all pass. A request exactly ${window} seconds after an older one no longer shares its window. Only already-allowed requests count toward the quota.`,
-    `Final gate: hidden mixed-traffic suites run at finish, with longer bursts and boundary timestamps. No new visible tests — defend what you built.`,
+    `Longer bursts and boundary timestamps: expect back-to-back requests at the window edge and bursts well above ${capacity}. Only already-allowed requests consume quota — denied ones never do.`,
   ];
   return { briefs, tests };
 }

@@ -53,7 +53,7 @@ function asRecord(v: unknown): Record<string, unknown> {
 function parseEvent(v: unknown): TraceEvent | null {
   const o = asRecord(v);
   if (typeof o.t !== "number" || typeof o.kind !== "string") return null;
-  const kinds: TraceEventKind[] = ["prompt", "code", "run", "stage", "hint"];
+  const kinds: TraceEventKind[] = ["prompt", "reply", "code", "run", "stage", "hint"];
   if (!kinds.includes(o.kind as TraceEventKind)) return null;
   const e: TraceEvent = { t: o.t, kind: o.kind as TraceEventKind };
   if (typeof o.text === "string") e.text = o.text;

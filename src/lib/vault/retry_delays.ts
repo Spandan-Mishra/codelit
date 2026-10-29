@@ -37,7 +37,7 @@ export function generateRetryDelays(seed: number): { briefs: [string, string, st
   const briefs: [string, string, string] = [
     `The ${team} deploy pipeline waits between retries. Implement retry_delays(failures, base, factor, cap): return the wait before each of ${failures[0]} attempts, where wait i is base * factor^i capped at cap. With base ${base}, factor ${factor} and cap ${cap}, retry_delays(${failures[0]}, ${base}, ${factor}, ${cap}) -> ${fmtSpaced(retryDelaysRef(failures[0], base, factor, cap))}.`,
     `Edge cases: zero failures means an empty schedule, and long outage streaks must flatline at the cap of ${cap} instead of growing forever. Delays never decrease along the schedule.`,
-    `Final gate: hidden streak lengths run at finish, including the longest outage windows. No new visible tests — defend what you built.`,
+    `Longer outage streaks: schedules many failures deep that must flatline at ${cap}. Delay i never exceeds the cap and never decreases along the schedule.`,
   ];
   return { briefs, tests };
 }
