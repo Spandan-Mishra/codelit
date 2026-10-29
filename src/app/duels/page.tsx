@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ALL_SCENARIOS as SCENARIOS } from "@/lib/scenarios";
 import { DIFFICULTIES, type DifficultyKey } from "@/lib/duel";
 import DuelCredits from "@/components/DuelCredits";
+import Leaderboard from "@/components/Leaderboard";
 import { Bot, Lock, MessageSquare, Swords, Timer } from "lucide-react";
 
 const ORDER: DifficultyKey[] = ["easy", "medium", "hard"];
@@ -83,6 +84,12 @@ export default function DuelsPage() {
           ))}
         </div>
       )}
+
+      <div id="leaderboard" className="mt-10 scroll-mt-6">
+        <h2 className="text-xl tracking-tight">Leaderboard</h2>
+        <p className="font-ui text-sm text-[#9a968c] mt-1">Top posted runs across scenarios.</p>
+        <Leaderboard scenarios={SCENARIOS.map((s) => ({ id: s.id, title: s.title }))} />
+      </div>
     </div>
   );
 }

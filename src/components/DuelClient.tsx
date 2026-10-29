@@ -3,6 +3,8 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import AgentClient from "@/components/AgentClient";
 import HousePanel, { type HouseOutcome } from "@/components/HousePanel";
+import PostToLeaderboard from "@/components/PostToLeaderboard";
+import { verdictTier } from "@/lib/judge";
 import { DUELS_KEY, type DifficultyKey, type DuelRecord, type DuelResult } from "@/lib/duel";
 import type { ScenarioStubs } from "@/lib/types";
 import { AlertTriangle, Swords } from "lucide-react";
@@ -154,7 +156,17 @@ export default function DuelClient(props: {
             : `Duel lost — balance ${outcome.credits}. Wins earn +2.`}{" "}
           <Link href="/passport" className="underline underline-offset-2">
             Passport →
-          </Link>
+          </Link>{" "}
+          <span className="ml-2 inline-flex">
+            <PostToLeaderboard
+              scenarioId={scenarioId}
+              difficulty={duelDifficulty}
+              score={outcome.result === "win" ? 100 : 0}
+              tier={verdictTier(outcome.result === "win" ? 100 : 0).label}
+              result={outcome.result}
+              prompts={0}
+            />
+          </span>
         </div>
       )}
       {resolveError && (
@@ -176,6 +188,8 @@ export default function DuelClient(props: {
             stubs={props.stubs}
             cppReturn={props.cppReturn}
             onFinish={(passed) => void handleFinish(passed)}
+            boardDifficulty={duelDifficulty}
+            boardResult={outcome?.result}
           />
         </div>
         <HousePanel

@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Editor from "@/components/Editor";
+import PostToLeaderboard from "@/components/PostToLeaderboard";
+import type { DifficultyKey } from "@/lib/duel";
+import type { BoardResult } from "@/lib/leaderboard";
 import { runTests, type RunResult } from "@/lib/runner";
 import { finalScore, provisionalScore, verdictTier } from "@/lib/judge";
 import type { DefendTurn, ScenarioStage, ScenarioStubs, TestCase } from "@/lib/types";
@@ -94,8 +97,12 @@ export default function AgentClient(props: {
   stubs?: ScenarioStubs;
   cppReturn?: string;
   onFinish?: (passed: boolean) => void;
+  boardDifficulty?: DifficultyKey;
+  boardResult?: BoardResult;
 }) {
   const { id, title, difficulty, tags, minutes, promptPar, timePar, fnName, stubs, cppReturn, onFinish } = props;
+  const boardDifficulty: DifficultyKey = props.boardDifficulty ?? "easy";
+  const boardResult: BoardResult = props.boardResult ?? "solo";
   const [phase, setPhase] = useState<"loading" | "code" | "verdict" | "defend" | "done" | "blocked">("loading");
   const [blockedMsg, setBlockedMsg] = useState("");
   const [retryAfterSec, setRetryAfterSec] = useState<number | null>(null);
@@ -733,9 +740,17 @@ export default function AgentClient(props: {
                 ))}
               </div>
               <div className="mt-4 space-y-2 text-sm">{turns.map((t, i) => <div key={i} className="rounded-md bg-black/40 border border-[#262824] p-3"><p className="font-semibold">Round {i + 1} — {t.score}/10 · {t.secondsUsed}s · pasted {t.pastedChars} chars</p><p className="text-[#9a968c] mt-1">Q: {t.question}</p><p className="mt-1">{t.feedback}</p></div>)}</div>
-              <div className="mt-5 flex flex-wrap gap-3">
+              <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href="/passport" className="px-4 py-2 rounded-md bg-[#e8b33d] text-black font-semibold text-sm">View passport</Link>
                 <Link href="/scenarios" className="px-4 py-2 rounded-md border border-[#3a3c37] text-sm">Back to scenarios</Link>
+                <PostToLeaderboard
+                  scenarioId={id}
+                  difficulty={boardDifficulty}
+                  score={r.score}
+                  tier={r.tier.label}
+                  result={boardResult}
+                  prompts={finishData.score.promptsUsed}
+                />
               </div>
             </div>
             );
