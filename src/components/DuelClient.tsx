@@ -110,7 +110,7 @@ export default function DuelClient(props: {
             <Swords className="h-4 w-4 text-[#e8b33d]" /> {props.duelLabel}
           </p>
           <p className="text-sm text-[#9a968c] mt-2 leading-6">
-            You + your agent vs the house agent ({props.duelModel}). First green wins — the house solves in about{" "}
+            You + your agent vs a simulated house pace ({props.duelModel}). First green wins — the simulation solves in about{" "}
             {Math.round(props.duelTargetSec / 60)}m.
             {props.duelCost > 0 && <> Entry: {props.duelCost} credits.</>} Wins pay +2.
           </p>
@@ -140,7 +140,7 @@ export default function DuelClient(props: {
     <div className="mx-auto max-w-7xl px-4 py-6">
       {houseFirst && !outcome && (
         <div className="mb-4 rounded-lg border border-red-400/30 bg-red-400/5 px-4 py-3 font-ui text-sm text-red-200">
-          House agent finished first — duel lost. Finish your run anyway for a personal score.
+          Simulated house finished first — duel lost. Finish your run anyway for a personal score.
         </div>
       )}
       {outcome && (

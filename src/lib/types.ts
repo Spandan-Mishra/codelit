@@ -34,6 +34,7 @@ export interface DefendTurn {
   feedback: string;
   secondsUsed: number;
   pastedChars: number;
+  engine?: string; // grader provenance: live model id or "offline"
 }
 
 export interface AttemptRecord {
@@ -104,4 +105,5 @@ export interface AgentAttempt {
   stageUnlocked: number; // 1-based
   events: TraceEvent[];
   cooldownUntil: number; // epoch ms, 0 = none
+  acceptedAt: number; // epoch ms of the last full hidden-suite pass, 0 = none
 }

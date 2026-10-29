@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { limited, clientIp } from "@/lib/ratelimit";
+import { verifiedPassSince } from "@/app/api/agent-run/route";
 import { getScenario } from "@/lib/scenarios";
 import {
   DIFFICULTIES,
@@ -103,11 +104,20 @@ export async function POST(req: Request) {
   }
 
   // --- resolve: user finished — compare against the house clock now ---
+  // A claimed user pass is only honored with a server-owned acceptance:
+  // the scenario's hidden suite must have fully passed after this duel
+  // started. Losses need no proof.
   if (action === "resolve") {
     const duel = ownedDuel(body.duelId, ip);
     if (!duel) return NextResponse.json({ error: "Unknown duel." }, { status: 404 });
     if (typeof body.userPassed !== "boolean") {
       return NextResponse.json({ error: "Missing userPassed." }, { status: 400 });
+    }
+    if (body.userPassed === true && !verifiedPassSince(ip, duel.scenarioId, duel.houseStartedAt)) {
+      return NextResponse.json(
+        { error: "No verified pass for this duel — finish the scenario run first." },
+        { status: 403 }
+      );
     }
     if (duel.decided) {
       const tick = tickDuel(duel.houseStartedAt, Date.now(), duel.difficulty);

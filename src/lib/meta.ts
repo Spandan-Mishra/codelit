@@ -116,7 +116,10 @@ export function fallbackGrade(answer: string, round: number, _code: string, trac
   const hits = signals.filter((s) => lower.includes(s)).length;
   const mentionsCode = /`|\bline\b|\bloop\b|\bdict\b|\bmap\b|\bstack\b|\bsort\b|\bindex\b/.test(lower);
   const mentionsTrace = Boolean(traceSummary) && /revert|my trace|decision|step \d+|prompt \d+/.test(lower);
-  let score = Math.min(10, 2 + hits + (mentionsCode ? 2 : 0) + (a.length > 220 ? 1 : 0) + (mentionsTrace ? 1 : 0));
+  // Offline grading is unverified keyword matching, not understanding: it can
+  // never award top marks, so keyword spam cannot reach a credible verdict.
+  // A live-graded defense is required for full credit.
+  let score = Math.min(6, 2 + hits + (mentionsCode ? 2 : 0) + (a.length > 220 ? 1 : 0) + (mentionsTrace ? 1 : 0));
   if (a.length > 40 && hits <= 1) score = Math.min(score, 4);
   const feedback =
     score >= 8

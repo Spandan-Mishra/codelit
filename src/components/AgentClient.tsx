@@ -435,6 +435,7 @@ export default function AgentClient(props: {
         feedback: data.feedback || "",
         secondsUsed: used,
         pastedChars: answerPaste,
+        engine: typeof data.engine === "string" ? data.engine : "unknown",
       };
       const next = [...turns, turn];
       setTurns(next);
@@ -715,7 +716,7 @@ export default function AgentClient(props: {
               <textarea value={answer} onChange={(e) => setAnswer(e.target.value)} onPaste={(e) => setAnswerPaste((p) => p + e.clipboardData.getData("text").length)} rows={6} placeholder="Answer from your code. Name lines, inputs, and what breaks…" className="mt-4 w-full rounded-md bg-black/50 border border-[#3a3c37] px-3 py-2.5 font-ui text-sm outline-none focus:border-[#e8b33d]" />
               <div className="mt-2 font-ui text-xs text-[#8a877d]">Pasted in this answer: {answerPaste} chars · Time will auto-submit at 0s.</div>
               <button onClick={() => void submitAnswer(false)} disabled={grading || !question} className="mt-4 font-ui px-5 py-2.5 rounded-md bg-[#e8b33d] text-black font-semibold text-sm disabled:opacity-50">{grading ? "Grading…" : round === 2 ? "Submit final answer" : "Submit & next round →"}</button>
-              {turns.length > 0 && <div className="mt-5 space-y-2 font-ui text-sm">{turns.map((t, i) => <div key={i} className="rounded-md bg-black/40 border border-[#262824] p-3">Round {i + 1}: <strong>{t.score}/10</strong> in {t.secondsUsed}s — {t.feedback}</div>)}</div>}
+              {turns.length > 0 && <div className="mt-5 space-y-2 font-ui text-sm">{turns.map((t, i) => <div key={i} className="rounded-md bg-black/40 border border-[#262824] p-3">Round {i + 1}: <strong>{t.score}/10</strong>{t.engine === "offline" && <span className="text-[#e8b33d]"> · offline, unverified</span>} in {t.secondsUsed}s — {t.feedback}</div>)}</div>}
             </div>
           )}
 
@@ -731,11 +732,15 @@ export default function AgentClient(props: {
               { label: `Efficiency ${finishData.score.promptsUsed}/${finishData.score.promptPar} prompts · ${Math.round(finishData.score.timeUsedSec / 60)}m`, value: r.breakdown.efficiency },
               { label: `Defense ${defendTotal}/30`, value: r.breakdown.defense ?? 0 },
             ];
+            const offlineGraded = turns.some((t) => t.engine === "offline");
             return (
             <div className="rounded-lg border border-emerald-400/30 bg-[#141613] p-5 font-ui">
               <p className="text-xs tracking-[0.18em] text-emerald-300">AGENT RUN COMPLETE</p>
               <p className="text-3xl mt-2">{r.score}<span className="text-lg text-[#9a968c]"> / 100 · {r.tier.label}</span></p>
               <p className="text-sm text-[#9a968c] mt-1">{r.tier.blurb}</p>
+              {offlineGraded && (
+                <p className="mt-2 text-xs text-[#e8b33d]">Graded offline — unverified. Full credit needs a live-graded defense.</p>
+              )}
               <div className="mt-4 space-y-2">
                 {rows.map((row) => (
                   <div key={row.label}>
@@ -744,7 +749,7 @@ export default function AgentClient(props: {
                   </div>
                 ))}
               </div>
-              <div className="mt-4 space-y-2 text-sm">{turns.map((t, i) => <div key={i} className="rounded-md bg-black/40 border border-[#262824] p-3"><p className="font-semibold">Round {i + 1} — {t.score}/10 · {t.secondsUsed}s · pasted {t.pastedChars} chars</p><p className="text-[#9a968c] mt-1">Q: {t.question}</p><p className="mt-1">{t.feedback}</p></div>)}</div>
+              <div className="mt-4 space-y-2 text-sm">{turns.map((t, i) => <div key={i} className="rounded-md bg-black/40 border border-[#262824] p-3"><p className="font-semibold">Round {i + 1} — {t.score}/10{t.engine === "offline" && <span className="text-[#e8b33d]"> · offline, unverified</span>} · {t.secondsUsed}s · pasted {t.pastedChars} chars</p><p className="text-[#9a968c] mt-1">Q: {t.question}</p><p className="mt-1">{t.feedback}</p></div>)}</div>
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <Link href="/passport" className="px-4 py-2 rounded-md bg-[#e8b33d] text-black font-semibold text-sm">View passport</Link>
                 <Link href="/scenarios" className="px-4 py-2 rounded-md border border-[#3a3c37] text-sm">Back to scenarios</Link>

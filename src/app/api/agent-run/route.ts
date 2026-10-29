@@ -23,6 +23,14 @@ function key(ip: string, scenarioId: string) {
   return `${ip}::${scenarioId}`;
 }
 
+// Server-owned acceptance record: did this ip fully pass this scenario's
+// hidden suite at or after sinceMs? Duel resolution consumes this instead
+// of trusting the client's userPassed claim.
+export function verifiedPassSince(ip: string, scenarioId: string, sinceMs: number): boolean {
+  const a = attempts.get(key(ip, scenarioId));
+  return Boolean(a && a.acceptedAt > 0 && a.acceptedAt >= sinceMs);
+}
+
 // Stage briefs for an attempt: generative scenarios overlay the seeded briefs
 // from generate(seed) onto the static stage titles/unlock hints.
 function stagesFor(scenario: Scenario, seed: number): ScenarioStage[] {
@@ -113,6 +121,7 @@ export async function POST(req: Request) {
       stageUnlocked: 1,
       events: [],
       cooldownUntil: 0,
+      acceptedAt: 0,
     };
     attempts.set(k, attempt);
     return NextResponse.json(publicState(attempt));
@@ -179,6 +188,7 @@ export async function POST(req: Request) {
       attempt.cooldownUntil = Date.now() + COOLDOWN_MS;
       const score = efficiencyScore(attempt);
       const passedCount = results.filter((r) => r.passed).length;
+      if (passedCount === results.length) attempt.acceptedAt = Date.now();
       return NextResponse.json({
         results,
         passed: passedCount === results.length,

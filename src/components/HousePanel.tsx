@@ -93,7 +93,7 @@ export default function HousePanel(props: {
     <aside className="rounded-lg border border-[#262824] bg-[#141613] p-5 font-ui lg:sticky lg:top-4">
       <div className="flex items-center justify-between gap-2">
         <p className="font-semibold text-sm flex items-center gap-2">
-          <Bot className="h-4 w-4 text-[#e8b33d]" /> House agent
+          <Bot className="h-4 w-4 text-[#e8b33d]" /> House pace · simulated
         </p>
         <span className="text-xs px-2 py-0.5 rounded-full border border-[#3a3c37] text-[#9a968c]">{difficultyLabel}</span>
       </div>
@@ -145,7 +145,7 @@ export default function HousePanel(props: {
       ) : (
         housePassed && (
           <p className="mt-4 rounded-md border border-red-400/30 bg-red-400/5 p-3 text-sm text-red-200">
-            House finished first.
+            Simulated house finished first.
           </p>
         )
       )}
