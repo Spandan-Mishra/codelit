@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Editor from "@/components/Editor";
 import { runTests, type RunResult } from "@/lib/runner";
-import { combineScores } from "@/lib/judge";
+import { finalScore, provisionalScore, verdictTier } from "@/lib/judge";
 import type { DefendTurn, ScenarioStage, TestCase } from "@/lib/types";
 import { Play, ShieldCheck, Timer, AlertTriangle, Lock, CheckCircle2 } from "lucide-react";
 
@@ -26,7 +26,9 @@ export interface AgentRunRecord {
 
 interface FinishScore {
   promptsUsed: number;
+  promptPar: number;
   timeUsedSec: number;
+  timeParSec: number;
   reverts: number;
   score0_100: number;
 }
@@ -118,7 +120,6 @@ export default function AgentClient(props: {
   const [secondsLeft, setSecondsLeft] = useState(DEFEND_SECONDS);
   const [grading, setGrading] = useState(false);
   const [turns, setTurns] = useState<DefendTurn[]>([]);
-  const [combined, setCombined] = useState<number | null>(null);
   const roundStart = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -362,12 +363,16 @@ export default function AgentClient(props: {
         await fetchQuestion(round + 1, next);
       } else {
         const total = next.reduce((s, t) => s + t.score, 0);
-        const score = combineScores(finishData.score.score0_100, total);
-        setCombined(score);
+        const r = finalScore({
+          passedCount: finishData.passedCount,
+          totalCount: finishData.totalCount,
+          traceScore0_100: finishData.score.score0_100,
+          defendTotal0_30: total,
+        });
         saveAgentRun({
           scenarioId: id,
           title,
-          score,
+          score: r.score,
           traceScore: finishData.score.score0_100,
           defendScore: total,
           prompts: finishData.score.promptsUsed,
@@ -534,6 +539,15 @@ export default function AgentClient(props: {
                   {finishData.passedCount}<span className="text-lg text-[#9a968c]"> / {finishData.totalCount} acceptance</span>
                 </p>
                 <p className="text-sm text-[#9a968c] mt-1">Trace: {finishData.traceSummary}</p>
+                {(() => {
+                  const prov = provisionalScore(finishData.score.score0_100);
+                  const tier = verdictTier(prov);
+                  return (
+                    <p className="mt-3 inline-block text-sm px-3 py-1.5 rounded-md bg-white/5">
+                      Provisional <strong>{prov}/100 · {tier.label}</strong> — defend your trace to bank a final score.
+                    </p>
+                  );
+                })()}
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
                   <span className="px-2.5 py-1 rounded-full bg-white/5">trace {finishData.score.score0_100}/100</span>
                   <span className="px-2.5 py-1 rounded-full bg-white/5">{finishData.score.promptsUsed} prompts</span>
@@ -572,16 +586,30 @@ export default function AgentClient(props: {
             </div>
           )}
 
-          {phase === "done" && (
+          {phase === "done" && finishData && (() => {
+            const r = finalScore({
+              passedCount: finishData.passedCount,
+              totalCount: finishData.totalCount,
+              traceScore0_100: finishData.score.score0_100,
+              defendTotal0_30: defendTotal,
+            });
+            const rows = [
+              { label: `Acceptance ${finishData.passedCount}/${finishData.totalCount}`, value: r.breakdown.acceptance },
+              { label: `Efficiency ${finishData.score.promptsUsed}/${finishData.score.promptPar} prompts · ${Math.round(finishData.score.timeUsedSec / 60)}m`, value: r.breakdown.efficiency },
+              { label: `Defense ${defendTotal}/30`, value: r.breakdown.defense ?? 0 },
+            ];
+            return (
             <div className="rounded-lg border border-emerald-400/30 bg-[#141613] p-5 font-ui">
               <p className="text-xs tracking-[0.18em] text-emerald-300">AGENT RUN COMPLETE</p>
-              <p className="text-3xl mt-2">{combined}<span className="text-lg text-[#9a968c]"> / 100</span></p>
-              <p className="text-sm text-[#9a968c] mt-1">
-                {combined !== null && combined >= 70 ? "Credible agent-assisted run." : combined !== null && combined >= 40 ? "Partial — tighten the trace or the defense." : "Not yet — the defense decides."}
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                <span className="px-2.5 py-1 rounded-full bg-white/5">trace {finishData?.score.score0_100}/100 × 60%</span>
-                <span className="px-2.5 py-1 rounded-full bg-white/5">defense {defendTotal}/30 × 40%</span>
+              <p className="text-3xl mt-2">{r.score}<span className="text-lg text-[#9a968c]"> / 100 · {r.tier.label}</span></p>
+              <p className="text-sm text-[#9a968c] mt-1">{r.tier.blurb}</p>
+              <div className="mt-4 space-y-2">
+                {rows.map((row) => (
+                  <div key={row.label}>
+                    <div className="flex justify-between text-xs text-[#9a968c]"><span>{row.label}</span><span>{row.value}</span></div>
+                    <div className="h-1.5 rounded bg-white/10 mt-1 overflow-hidden"><div className="h-full bg-[#e8b33d]" style={{ width: `${row.value}%` }} /></div>
+                  </div>
+                ))}
               </div>
               <div className="mt-4 space-y-2 text-sm">{turns.map((t, i) => <div key={i} className="rounded-md bg-black/40 border border-[#262824] p-3"><p className="font-semibold">Round {i + 1} — {t.score}/10 · {t.secondsUsed}s · pasted {t.pastedChars} chars</p><p className="text-[#9a968c] mt-1">Q: {t.question}</p><p className="mt-1">{t.feedback}</p></div>)}</div>
               <div className="mt-5 flex flex-wrap gap-3">
@@ -589,7 +617,8 @@ export default function AgentClient(props: {
                 <Link href="/scenarios" className="px-4 py-2 rounded-md border border-[#3a3c37] text-sm">Back to scenarios</Link>
               </div>
             </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

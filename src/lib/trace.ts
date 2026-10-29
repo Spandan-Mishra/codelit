@@ -103,7 +103,9 @@ export function findReverts(events: TraceEvent[]): number[] {
 
 export interface EfficiencyScore {
   promptsUsed: number;
+  promptPar: number;
   timeUsedSec: number;
+  timeParSec: number;
   reverts: number;
   score0_100: number;
 }
@@ -116,6 +118,7 @@ export function efficiencyScore(attempt: AgentAttempt): EfficiencyScore {
   const reverts = findReverts(attempt.events).length;
 
   const scenario = getScenario(attempt.scenarioId);
+  const promptPar = scenario?.promptPar ?? PROMPT_BUDGET;
   const timeParSec = (scenario?.timePar ?? 20) * 60;
   const promptPenalty = Math.min(35, promptsUsed * 5);
   const timePenalty = timeUsedSec > timeParSec ? Math.min(25, Math.round(((timeUsedSec - timeParSec) / timeParSec) * 25)) : 0;
@@ -126,7 +129,7 @@ export function efficiencyScore(attempt: AgentAttempt): EfficiencyScore {
   // reads as pasted code, so it cannot score above 30 on trace alone.
   if (attempt.status === "finished" && promptsUsed === 0) score = Math.min(score, 30);
 
-  return { promptsUsed, timeUsedSec, reverts, score0_100: score };
+  return { promptsUsed, promptPar, timeUsedSec, timeParSec, reverts, score0_100: score };
 }
 
 // One-liner for the defense round, e.g. "3 prompts, 1 revert at step 4,

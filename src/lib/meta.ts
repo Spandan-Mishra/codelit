@@ -73,6 +73,10 @@ export function fallbackQuestion(
   const f = analyzeCode(code, fnName);
   const seed = (code.length + round * 17 + history.length * 7) % 3;
   if (round === 0) {
+    // Trace-grounded defense: round 1 asks about the decision that drove the run.
+    if (traceSummary) {
+      return `Your trace shows ${traceSummary}. Which single prompt or decision moved your run forward the most — and what exactly did it change in the code? Quote the line. You have 90 seconds; a generic answer will not match your trace.`;
+    }
     if (f.usesDict) return `In 2–3 sentences: what does your map store at each step of "${problemTitle}", and what invariant guarantees you never reuse the same element twice? Answer from your code, not the problem statement.`;
     if (f.usesSort) return `Why must your code sort before the main pass in "${problemTitle}"? Give the exact input order that breaks it if the sort is removed.`;
     if (f.usesStack) return `What exactly do you push and pop in "${problemTitle}", and what does the stack look like on the input from the second example?`;
@@ -90,6 +94,10 @@ export function fallbackQuestion(
       `I delete one line from your solution — the one your correctness depends on most. Which line, and which test catches the deletion first?`,
     ];
     return variants[seed];
+  }
+  // Trace-grounded defense: round 3 closes on trace honesty when we have one.
+  if (traceSummary && seed === 0) {
+    return `Your trace shows ${traceSummary}. Looking back, which prompt or step cost you the most for the least progress — and what would you ask or try instead next time? One concrete lesson, no generalities.`;
   }
   const variants = [
     `State your time and space complexity and name the input size where your approach becomes the wrong choice. What would you switch to, and what breaks in your current code first?`,

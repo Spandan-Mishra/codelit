@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getAttempts, getDebugRecords, credibilityScore, getName, setName } from "@/lib/store";
 import { PROBLEMS, DEBUG_CHALLENGES } from "@/lib/problems";
 import type { AttemptRecord, DebugRecord } from "@/lib/types";
+import { verdictTier } from "@/lib/judge";
 import { ShieldCheck, Bug, Bot } from "lucide-react";
 
 interface AgentRunRecord {
@@ -147,7 +148,7 @@ export default function PassportPage() {
                 <div className="mt-3 space-y-2 font-ui text-sm">{agentRuns.map((r, i) => (
                   <div key={`${r.scenarioId}-${i}`} className="flex flex-wrap gap-x-2 gap-y-1.5 items-center rounded-md bg-black/40 border border-[#262824] px-3 py-2.5">
                     <span className="flex-1 min-w-40">{r.title}</span>
-                    <span>{r.score}/100</span>
+                    <span>{r.score}/100 · {verdictTier(r.score).label}</span>
                     <span className="text-[#8a877d] text-xs">{r.prompts} prompts · {Math.max(1, Math.round(r.secondsUsed / 60))}m</span>
                   </div>
                 ))}</div>
