@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Bot, CheckCircle2, KeyRound, XCircle } from "lucide-react";
+import NativeConnect from "@/components/NativeConnect";
 import { PROVIDERS, type ProviderDef, type ProviderId } from "@/lib/agents";
 import {
   getAgentConfig,
@@ -302,6 +303,10 @@ export default function AgentsPage() {
         Keys stay on this device — they are only sent inside assist requests. The House agent is
         free and needs no key. <Link href="/scenarios" className="text-[#e8b33d] hover:underline rounded">Run a scenario →</Link>
       </p>
+
+      <div className="mt-6">
+        <NativeConnect />
+      </div>
 
       {!loaded ? (
         <div className="mt-6 grid gap-4 md:grid-cols-2" aria-busy="true" aria-label="Loading providers">
