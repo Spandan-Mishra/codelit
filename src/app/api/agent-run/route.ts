@@ -64,11 +64,20 @@ function parseEvent(v: unknown): TraceEvent | null {
 
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  if (limited(`agent-run:${ip}`, 20)) {
+  let body: Record<string, unknown>;
+  try {
+    body = asRecord(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const action = body.action;
+  // Separate buckets: event appends are cheap and frequent during a run;
+  // start/finish trigger execution and stay tight so a chatty event stream
+  // can never burn the budget needed to finish.
+  const isEvent = action === "event";
+  if (limited(`agent-run:${isEvent ? "event" : "exec"}:${ip}`, isEvent ? 120 : 15)) {
     return NextResponse.json({ error: "Rate limited — wait a minute." }, { status: 429 });
   }
-  const body = asRecord(await req.json());
-  const action = body.action;
   const scenarioId = typeof body.scenarioId === "string" ? body.scenarioId : "";
   const scenario = getScenario(scenarioId);
   if (!scenario) return NextResponse.json({ error: "Unknown scenario." }, { status: 400 });

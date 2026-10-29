@@ -30,9 +30,16 @@ export default function HousePanel(props: {
   const [error, setError] = useState("");
   const notified = useRef(false);
 
+  // Poll every 4s; consecutive failures back off exponentially (capped at
+  // 30s) so a struggling feed isn't hammered by a fixed-interval loop.
   useEffect(() => {
     if (frozen || outcome) return;
     let alive = true;
+    let failures = 0;
+    let t: ReturnType<typeof setTimeout>;
+    function schedule(ms: number) {
+      if (alive) t = setTimeout(() => void poll(), ms);
+    }
     async function poll() {
       try {
         const res = await fetch("/api/duel", {
@@ -43,9 +50,12 @@ export default function HousePanel(props: {
         const data = await res.json();
         if (!alive) return;
         if (!res.ok) {
+          failures += 1;
           setError(typeof data.error === "string" ? data.error : `House feed error ${res.status}. Retrying…`);
+          schedule(Math.min(4000 * 2 ** failures, 30000));
           return;
         }
+        failures = 0;
         setError("");
         if (typeof data.stepLabel === "string") setStepLabel(data.stepLabel);
         if (typeof data.progress0_100 === "number") setProgress(Math.max(0, Math.min(100, data.progress0_100)));
@@ -57,15 +67,18 @@ export default function HousePanel(props: {
             onHouseFirst();
           }
         }
+        schedule(4000);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? `${e.message}. Retrying…` : "House feed unreachable. Retrying…");
+        if (!alive) return;
+        failures += 1;
+        setError(e instanceof Error ? `${e.message}. Retrying…` : "House feed unreachable. Retrying…");
+        schedule(Math.min(4000 * 2 ** failures, 30000));
       }
     }
     void poll();
-    const t = setInterval(() => void poll(), 2000);
     return () => {
       alive = false;
-      clearInterval(t);
+      clearTimeout(t);
     };
   }, [duelId, frozen, outcome, onHouseFirst]);
 

@@ -42,11 +42,20 @@ function ownedDuel(duelId: unknown, ip: string): DuelState | null {
 
 export async function POST(req: Request) {
   const ip = clientIp(req);
-  if (limited(`duel:${ip}`, 20)) {
+  let body: Record<string, unknown>;
+  try {
+    body = asRecord(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  const action = body.action;
+  // Separate buckets: cheap status polls (the HousePanel polls every few
+  // seconds) must never starve state-changing actions, and a polling loop
+  // must never burn the budget needed to create/resolve.
+  const isStatusPoll = action === "status";
+  if (limited(`duel:${isStatusPoll ? "status" : "action"}:${ip}`, isStatusPoll ? 60 : 20)) {
     return NextResponse.json({ error: "Rate limited — wait a minute." }, { status: 429 });
   }
-  const body = asRecord(await req.json());
-  const action = body.action;
 
   if (action === "credits") {
     return NextResponse.json({ credits: getCredits(ip) });
