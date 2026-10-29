@@ -3,7 +3,7 @@ import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Codelit — prove you wrote it",
+  title: "Codelit — show how you work",
   description: "Cheat-resistant coding prep: solve, then defend your code under timed interrogation.",
 };
 
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto max-w-6xl px-4 min-h-14 py-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
             <Link href="/" className="font-code font-bold tracking-tight text-lg rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">
               code<span className="text-[#e8b33d]">lit</span>
-              <span className="ml-2 hidden md:inline text-[11px] font-ui font-normal text-[#9a968c]">prove you wrote it</span>
+              <span className="ml-2 hidden md:inline text-[11px] font-ui font-normal text-[#9a968c]">show how you work</span>
             </Link>
             <nav aria-label="Primary" className="ml-auto flex items-center gap-0.5 sm:gap-1 font-ui text-[13px] sm:text-sm overflow-x-auto">
               {NAV.map((n) => (

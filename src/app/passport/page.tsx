@@ -83,9 +83,9 @@ export default function PassportPage() {
           <div className="rounded-lg border border-dashed border-[#3a3c37] bg-[#141613] p-6 sm:p-8 text-center font-ui">
             <ShieldCheck className="mx-auto h-8 w-8 text-[#e8b33d]" />
             <p className="mt-3 font-semibold">Your passport is blank.</p>
-            <p className="mt-1 text-[13px] text-[#9a968c] max-w-sm mx-auto leading-6">Solve a problem, defend it under the clock, and your trace shows up here.</p>
+            <p className="mt-1 text-[13px] text-[#9a968c] max-w-sm mx-auto leading-6">Run a scenario, defend your trace, and your score shows up here.</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2.5">
-              <Link href="/practice" className="text-sm font-semibold px-4 py-2 rounded-md bg-[#e8b33d] text-black hover:bg-[#f2c14e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Start practicing</Link>
+              <Link href="/scenarios" className="text-sm font-semibold px-4 py-2 rounded-md bg-[#e8b33d] text-black hover:bg-[#f2c14e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Run a scenario</Link>
               <Link href="/debug" className="text-sm px-4 py-2 rounded-md border border-[#3a3c37] hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Try Debug Under Fire</Link>
             </div>
           </div>
@@ -107,7 +107,7 @@ export default function PassportPage() {
               {attempts.length === 0 ? (
                 <div className="mt-3 rounded-md border border-dashed border-[#3a3c37] px-4 py-5 text-center font-ui">
                   <p className="text-sm text-[#9a968c]">No defenses yet.</p>
-                  <Link href="/practice" className="mt-2 inline-block text-sm text-[#e8b33d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d] rounded">Solve and defend one →</Link>
+                  <Link href="/scenarios" className="mt-2 inline-block text-sm text-[#e8b33d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d] rounded">Run a scenario →</Link>
                 </div>
               ) : (
                 <div className="mt-3 space-y-2 font-ui text-sm">{attempts.map((a) => (

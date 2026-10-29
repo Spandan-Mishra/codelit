@@ -3,14 +3,14 @@ import type { Problem, DebugChallenge } from "./types";
 export const PROBLEMS: Problem[] = [
   {
     id: "two-sum",
-    title: "Two Sum — with a twist you must defend",
+    title: "Two Sum",
     difficulty: "Easy",
     tags: ["Hash Map", "Arrays"],
     mode: "practice",
     minutes: 20,
     defendSeconds: 90,
     statement:
-      "Given an array `nums` and an integer `target`, return the indices of the two numbers that add up to `target`. Exactly one solution exists and the same element cannot be used twice. Then defend it: the follow-ups mutate your code live, so pasting an answer is not enough.",
+      "Given an array `nums` and an integer `target`, return the indices of the two numbers that add up to `target`. Exactly one solution exists and the same element cannot be used twice.",
     constraints: ["2 ≤ nums.length ≤ 10^4", "-10^9 ≤ nums[i], target ≤ 10^9", "Return indices in any order"],
     examples: [
       { input: "nums = [2,7,11,15], target = 9", output: "[0,1]" },
@@ -59,14 +59,14 @@ export const PROBLEMS: Problem[] = [
   },
   {
     id: "merge-intervals",
-    title: "Merge Intervals — Graded (one shot)",
+    title: "Merge Intervals",
     difficulty: "Medium",
     tags: ["Sorting", "Intervals"],
     mode: "arena",
     minutes: 25,
     defendSeconds: 90,
     statement:
-      "Given intervals `[start, end]`, merge all overlapping intervals and return the non-overlapping cover sorted by start. This is a graded Arena problem: you get one defended attempt. Practice problems never lock; Arena does.",
+      "Given intervals `[start, end]`, merge all overlapping intervals and return the non-overlapping cover sorted by start.",
     constraints: ["1 ≤ intervals.length ≤ 10^4", "intervals[i].length == 2"],
     examples: [{ input: "[[1,3],[2,6],[8,10],[15,18]]", output: "[[1,6],[8,10],[15,18]]" }],
     starterPy: "def merge(intervals):\n    # your code here\n    pass\n",
@@ -83,14 +83,14 @@ export const PROBLEMS: Problem[] = [
   },
   {
     id: "group-anagrams",
-    title: "Group Anagrams — Graded (one shot)",
+    title: "Group Anagrams",
     difficulty: "Medium",
     tags: ["Hash Map", "Strings"],
     mode: "arena",
     minutes: 25,
     defendSeconds: 90,
     statement:
-      "Group the strings in `strs` that are anagrams of each other. Return groups in any order. Graded Arena: one defended attempt only.",
+      "Group the strings in `strs` that are anagrams of each other. Return groups in any order.",
     constraints: ["1 ≤ strs.length ≤ 10^4", "strs[i] is lowercase English"],
     examples: [{ input: '["eat","tea","tan","ate","nat","bat"]', output: '[["bat"],["nat","tan"],["ate","eat","tea"]]' }],
     starterPy: "def group_anagrams(strs):\n    # your code here\n    pass\n",
@@ -211,7 +211,7 @@ export const PROBLEMS: Problem[] = [
   },
   {
     id: "longest-substring",
-    title: "Longest Substring Without Repeating Characters — Graded (one shot)",
+    title: "Longest Substring",
     difficulty: "Medium",
     tags: ["Sliding Window", "Hash Map"],
     mode: "arena",
@@ -239,7 +239,7 @@ export const PROBLEMS: Problem[] = [
   },
   {
     id: "kth-largest",
-    title: "Kth Largest Element — Graded (one shot)",
+    title: "Kth Largest",
     difficulty: "Medium",
     tags: ["Heap", "Divide and Conquer"],
     mode: "arena",

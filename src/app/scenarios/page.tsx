@@ -17,8 +17,7 @@ export default function ScenariosPage() {
       {SCENARIOS.length === 0 ? (
         <div className="mt-6 rounded-lg border border-[#262824] bg-[#141613] px-5 py-8 text-center font-ui">
           <p className="text-sm font-semibold">No scenarios right now.</p>
-          <p className="mt-1 text-[13px] text-[#9a968c]">Try Practice while new ones land.</p>
-          <Link href="/practice" className="mt-4 inline-block text-sm px-4 py-2 rounded-md border border-[#3a3c37] hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Go to Practice →</Link>
+          <p className="mt-1 text-[13px] text-[#9a968c]">New ones land soon.</p>
         </div>
       ) : (
         <div className="grid gap-2.5 mt-6">

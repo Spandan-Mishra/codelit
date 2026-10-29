@@ -136,7 +136,7 @@ function mergeTests(seed: number): TestCase[] {
 export const SCENARIOS: Scenario[] = [
   {
     id: "agent-two-sum",
-    title: "Pair Sum with an agent looking over your shoulder",
+    title: "Pair Sum",
     difficulty: "Easy",
     tags: ["Hash Map", "Arrays"],
     minutes: 20,
@@ -169,7 +169,7 @@ export const SCENARIOS: Scenario[] = [
   },
   {
     id: "agent-merge-intervals",
-    title: "Merge Sweep with an agent looking over your shoulder",
+    title: "Merge Sweep",
     difficulty: "Medium",
     tags: ["Sorting", "Intervals"],
     minutes: 25,
