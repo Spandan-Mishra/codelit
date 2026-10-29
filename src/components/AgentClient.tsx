@@ -129,6 +129,8 @@ export default function AgentClient(props: {
   const [assistError, setAssistError] = useState("");
   const [assistPrompt, setAssistPrompt] = useState("");
   const [assistLabel, setAssistLabel] = useState("House Agent (free)");
+  const [assistInput, setAssistInput] = useState("");
+  const [assistHistory, setAssistHistory] = useState<{ role: "you" | "agent"; text: string }[]>([]);
 
   const [results, setResults] = useState<RunResult[] | null>(null);
   const [running, setRunning] = useState(false);
@@ -254,9 +256,15 @@ export default function AgentClient(props: {
       const brief = stages.length ? stages[stages.length - 1].brief : "";
       const system =
         "You are a coding coach. Give a short hint (2-3 sentences): point at the likely bug or next step, ask one focusing question. Never write the full solution.";
-      const user =
-        `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}`.slice(0, 5500);
+      const typed = assistInput.trim();
+      const user = (
+        typed
+          ? `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}\nMy question: ${typed}`
+          : `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}`
+      ).slice(0, 5500);
       setAssistPrompt(user);
+      if (typed) setAssistHistory((h) => [...h, { role: "you", text: typed }]);
+      setAssistInput("");
       const res = await fetch("/api/agent-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -274,7 +282,9 @@ export default function AgentClient(props: {
         setAssistError(typeof data.error === "string" ? data.error : `Server error ${res.status}`);
         return;
       }
-      setAssistReply(typeof data.text === "string" ? data.text : "");
+      const replyText = typeof data.text === "string" ? data.text : "";
+      setAssistReply(replyText);
+      if (replyText) setAssistHistory((h) => [...h, { role: "agent", text: replyText }]);
       setAssistEngine(typeof data.engine === "string" ? data.engine : "");
     } catch (e) {
       setAssistError(e instanceof Error ? e.message : String(e));
@@ -517,6 +527,12 @@ export default function AgentClient(props: {
       {resumed && (
         <p className="mt-2 font-ui text-xs text-[#8a877d]">Resumed your active attempt — earlier trace events are kept server-side.</p>
       )}
+      <ol className="mt-4 flex flex-wrap gap-x-5 gap-y-1.5 font-ui text-xs text-[#9a968c]">
+        <li><span className="font-code text-[#e8b33d]">1</span> Chat with your agent below</li>
+        <li><span className="font-code text-[#e8b33d]">2</span> Log each prompt — it counts</li>
+        <li><span className="font-code text-[#e8b33d]">3</span> Code, run tests, submit stages</li>
+        <li><span className="font-code text-[#e8b33d]">4</span> Finish, then defend your trace</li>
+      </ol>
 
       <div className="mt-6 grid lg:grid-cols-[0.9fr_1.1fr] gap-6 items-start">
         <div className="rounded-lg border border-[#262824] bg-[#141613] p-5">
@@ -595,27 +611,43 @@ export default function AgentClient(props: {
                 {assistOpen && (
                   <div className="px-5 pb-5">
                     <p className="text-xs text-[#8a877d] leading-5">
-                      Sends your current code and the stage brief to your configured agent.{" "}
+                      Talk to your configured agent — every message carries your current code and the stage brief.{" "}
                       <Link href="/agents" className="text-[#e8b33d] hover:underline rounded">Manage providers →</Link>
                     </p>
-                    <button
-                      onClick={() => void askAgent()}
-                      disabled={assistLoading}
-                      className="mt-3 px-4 py-2 rounded-md border border-[#3a3c37] text-sm disabled:opacity-40"
-                    >
-                      {assistLoading ? "Asking…" : "Ask for a hint"}
-                    </button>
+                    {assistHistory.length > 0 && (
+                      <ol className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+                        {assistHistory.map((m, i) => (
+                          <li key={i} className={`rounded-md border px-3 py-2 text-[13px] leading-6 ${m.role === "you" ? "bg-white/5 border-[#3a3c37] text-[#ddd9cf]" : "bg-black/40 border-[#262824] text-[#b9b5a9]"}`}>
+                            <span className="font-code text-[11px] text-[#8a877d] block mb-0.5">{m.role === "you" ? "YOU" : assistLabel.toUpperCase()}</span>
+                            {m.text.length > 400 ? `${m.text.slice(0, 400)}…` : m.text}
+                          </li>
+                        ))}
+                      </ol>
+                    )}
+                    {assistEngine && assistReply && <p className="font-code text-[11px] text-[#8a877d] mt-2">via {assistEngine}</p>}
                     {assistError && <p className="text-sm text-red-300 mt-3">{assistError}</p>}
-                    {assistReply && (
-                      <div className="mt-3 rounded-md bg-black/40 border border-[#262824] px-3 py-2.5 text-[13px] text-[#b9b5a9] leading-6">
-                        {assistEngine && <p className="font-code text-xs text-[#8a877d] mb-1">{assistEngine}</p>}
-                        {assistReply}
-                        <div className="mt-2">
-                          <button onClick={logAssistPrompt} className="px-3 py-1.5 rounded-md border border-[#3a3c37] text-xs">
-                            Log prompt to trace
-                          </button>
-                        </div>
-                      </div>
+                    <div className="mt-3 flex gap-2">
+                      <label htmlFor="assist-input" className="sr-only">Message your agent</label>
+                      <input
+                        id="assist-input"
+                        value={assistInput}
+                        onChange={(e) => setAssistInput(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !assistLoading) void askAgent(); }}
+                        placeholder="Ask about your code, or send empty for a hint…"
+                        className="flex-1 min-w-0 rounded-md bg-black/50 border border-[#3a3c37] px-3 py-2 text-sm outline-none focus:border-[#e8b33d]"
+                      />
+                      <button
+                        onClick={() => void askAgent()}
+                        disabled={assistLoading}
+                        className="shrink-0 px-4 py-2 rounded-md bg-[#e8b33d] text-black font-semibold text-sm disabled:opacity-40"
+                      >
+                        {assistLoading ? "Asking…" : "Send"}
+                      </button>
+                    </div>
+                    {assistPrompt && (
+                      <button onClick={logAssistPrompt} className="mt-2 px-3 py-1.5 rounded-md border border-[#3a3c37] text-xs">
+                        Log last prompt to trace
+                      </button>
                     )}
                   </div>
                 )}
