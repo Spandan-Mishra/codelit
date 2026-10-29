@@ -4,11 +4,35 @@ import { useEffect, useState } from "react";
 import { getAttempts, getDebugRecords, credibilityScore, getName, setName } from "@/lib/store";
 import { PROBLEMS, DEBUG_CHALLENGES } from "@/lib/problems";
 import type { AttemptRecord, DebugRecord } from "@/lib/types";
-import { ShieldCheck, Bug } from "lucide-react";
+import { ShieldCheck, Bug, Bot } from "lucide-react";
+
+interface AgentRunRecord {
+  scenarioId: string;
+  title: string;
+  score: number;
+  traceScore: number;
+  defendScore: number;
+  prompts: number;
+  secondsUsed: number;
+  finishedAt: string;
+}
+
+const AGENT_RUNS_KEY = "codelit:agent-runs";
+
+function getAgentRuns(): AgentRunRecord[] {
+  try {
+    const raw = localStorage.getItem(AGENT_RUNS_KEY);
+    const arr = raw ? (JSON.parse(raw) as AgentRunRecord[]) : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
 
 export default function PassportPage() {
   const [attempts, setAttempts] = useState<AttemptRecord[]>([]);
   const [debug, setDebug] = useState<DebugRecord[]>([]);
+  const [agentRuns, setAgentRuns] = useState<AgentRunRecord[]>([]);
   const [name, setNameState] = useState("");
   const [cred, setCred] = useState({ score: 0, defended: 0, debugSolved: 0, total: 0 });
   const [loaded, setLoaded] = useState(false);
@@ -16,6 +40,7 @@ export default function PassportPage() {
   function refresh() {
     setAttempts(Object.values(getAttempts()));
     setDebug(Object.values(getDebugRecords()));
+    setAgentRuns(getAgentRuns());
     setCred(credibilityScore());
     setNameState(getName());
     setLoaded(true);
@@ -24,7 +49,7 @@ export default function PassportPage() {
 
   const title = (id: string) => PROBLEMS.find((p) => p.id === id)?.title || id;
   const dtitle = (id: string) => DEBUG_CHALLENGES.find((d) => d.id === id)?.title || id;
-  const empty = loaded && attempts.length === 0 && debug.length === 0;
+  const empty = loaded && attempts.length === 0 && debug.length === 0 && agentRuns.length === 0;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
@@ -107,6 +132,23 @@ export default function PassportPage() {
                   <div key={d.challengeId} className="flex flex-wrap gap-x-2 gap-y-1.5 items-center rounded-md bg-black/40 border border-[#262824] px-3 py-2.5">
                     <span className="flex-1 min-w-40">{dtitle(d.challengeId)}</span>
                     <span>{d.status}</span><span className="text-[#8a877d] text-xs">{d.promptsUsed} prompts · {d.secondsUsed}s</span>
+                  </div>
+                ))}</div>
+              )}
+            </div>
+            <div className="rounded-lg border border-[#262824] bg-[#141613] p-5">
+              <h2 className="font-ui font-semibold flex items-center gap-2"><Bot className="h-4 w-4 text-[#e8b33d]" /> Agent runs</h2>
+              {agentRuns.length === 0 ? (
+                <div className="mt-3 rounded-md border border-dashed border-[#3a3c37] px-4 py-5 text-center font-ui">
+                  <p className="text-sm text-[#9a968c]">No agent runs yet.</p>
+                  <Link href="/scenarios" className="mt-2 inline-block text-sm text-[#e8b33d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d] rounded">Run a scenario →</Link>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2 font-ui text-sm">{agentRuns.map((r, i) => (
+                  <div key={`${r.scenarioId}-${i}`} className="flex flex-wrap gap-x-2 gap-y-1.5 items-center rounded-md bg-black/40 border border-[#262824] px-3 py-2.5">
+                    <span className="flex-1 min-w-40">{r.title}</span>
+                    <span>{r.score}/100</span>
+                    <span className="text-[#8a877d] text-xs">{r.prompts} prompts · {Math.max(1, Math.round(r.secondsUsed / 60))}m</span>
                   </div>
                 ))}</div>
               )}

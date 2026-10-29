@@ -67,7 +67,8 @@ export function fallbackQuestion(
   problemTitle: string,
   code: string,
   fnName: string,
-  history: { question: string; answer: string }[]
+  history: { question: string; answer: string }[],
+  traceSummary?: string
 ): string {
   const f = analyzeCode(code, fnName);
   const seed = (code.length + round * 17 + history.length * 7) % 3;
@@ -78,6 +79,10 @@ export function fallbackQuestion(
     return `Walk me through your code on the smallest non-trivial input. What is the loop invariant after the first iteration?`;
   }
   if (round === 1) {
+    // Trace-aware defense: round 2 references the revert/decision point.
+    if (traceSummary) {
+      return `Your trace shows ${traceSummary}. Point to the exact decision where your approach turned — the revert or the prompt that changed it — and explain what was wrong before and why the new direction is correct. Quote the line. You have 90 seconds; a generic answer will not match your trace.`;
+    }
     const line = f.condLine || f.loopLine;
     const variants = [
       `Live mutation: I change your line \`${line.slice(0, 70)}\` — flipping its comparison/boundary by one. Name the smallest input that now fails and trace why. You have 90 seconds; a pasted generic answer will not match your line.`,
@@ -94,7 +99,7 @@ export function fallbackQuestion(
   return variants[seed];
 }
 
-export function fallbackGrade(answer: string, round: number, _code: string): { score: number; feedback: string } {
+export function fallbackGrade(answer: string, round: number, _code: string, traceSummary?: string): { score: number; feedback: string } {
   void _code;
   const a = answer.trim();
   if (a.length < 25) return { score: 1, feedback: "Too short to prove understanding. The defense rewards specifics from your own code." };
@@ -102,7 +107,8 @@ export function fallbackGrade(answer: string, round: number, _code: string): { s
   const signals = ["because", " invariant", "complexity", "o(", "fail", "break", "edge", "duplicate", "return", "line", "input", "example", "trade", "memory", "time"];
   const hits = signals.filter((s) => lower.includes(s)).length;
   const mentionsCode = /`|\bline\b|\bloop\b|\bdict\b|\bmap\b|\bstack\b|\bsort\b|\bindex\b/.test(lower);
-  let score = Math.min(10, 2 + hits + (mentionsCode ? 2 : 0) + (a.length > 220 ? 1 : 0));
+  const mentionsTrace = Boolean(traceSummary) && /revert|my trace|decision|step \d+|prompt \d+/.test(lower);
+  let score = Math.min(10, 2 + hits + (mentionsCode ? 2 : 0) + (a.length > 220 ? 1 : 0) + (mentionsTrace ? 1 : 0));
   if (a.length > 40 && hits <= 1) score = Math.min(score, 4);
   const feedback =
     score >= 8
@@ -120,22 +126,26 @@ export async function nextQuestion(args: {
   code: string;
   fnName: string;
   history: { question: string; answer: string }[];
+  traceSummary?: string;
 }): Promise<{ question: string; engine: string }> {
+  const traceLine = args.traceSummary ? ` Candidate trace: ${args.traceSummary}.` : "";
   const live = await callMeta([
     {
       role: "system",
       content:
         "You are Codelit's interrogator. Ask ONE short defense question. Round focus: " +
         ROUND_FOCUS[args.round] +
-        ". Reference the candidate's actual code lines. Make it personalized and timed so a generic pasted AI answer does not fit. No preamble, just the question.",
+        ". Reference the candidate's actual code lines." +
+        (args.traceSummary ? " Reference their trace (prompts, reverts, decision points)." : "") +
+        " Make it personalized and timed so a generic pasted AI answer does not fit. No preamble, just the question.",
     },
     {
       role: "user",
-      content: `Problem: ${args.problemTitle}\n${args.statement}\nCandidate code:\n${args.code}\nPrior Q&A: ${JSON.stringify(args.history)}\nAsk round ${args.round + 1} of 3.`,
+      content: `Problem: ${args.problemTitle}\n${args.statement}\nCandidate code:\n${args.code}\nPrior Q&A: ${JSON.stringify(args.history)}${traceLine}\nAsk round ${args.round + 1} of 3.`,
     },
   ]);
   if (live) return { question: live.trim(), engine: INTERROGATE_MODEL };
-  return { question: fallbackQuestion(args.round, args.problemTitle, args.code, args.fnName, args.history), engine: "offline" };
+  return { question: fallbackQuestion(args.round, args.problemTitle, args.code, args.fnName, args.history, args.traceSummary), engine: "offline" };
 }
 
 export async function gradeAnswer(args: {
@@ -143,14 +153,17 @@ export async function gradeAnswer(args: {
   question: string;
   answer: string;
   code: string;
+  traceSummary?: string;
 }): Promise<{ score: number; feedback: string; engine: string }> {
+  const traceLine = args.traceSummary ? `\nCandidate trace: ${args.traceSummary}` : "";
   const live = await callMeta([
     {
       role: "system",
       content:
-        'Grade a coding-defense answer 0-10 for specificity to the candidate code. Reply exactly as JSON: {"score": number, "feedback": "one sentence"}. Generic answers that fit any solution score <=4.',
+        'Grade a coding-defense answer 0-10 for specificity to the candidate code. Reply exactly as JSON: {"score": number, "feedback": "one sentence"}. Generic answers that fit any solution score <=4.' +
+        (args.traceSummary ? " Reward answers that accurately reference their own trace (reverts, decision points)." : ""),
     },
-    { role: "user", content: `Question: ${args.question}\nCandidate code:\n${args.code}\nAnswer: ${args.answer}` },
+    { role: "user", content: `Question: ${args.question}\nCandidate code:\n${args.code}\nAnswer: ${args.answer}${traceLine}` },
   ]);
   if (live) {
     try {
@@ -160,7 +173,7 @@ export async function gradeAnswer(args: {
       /* fall through */
     }
   }
-  const g = fallbackGrade(args.answer, args.round, args.code);
+  const g = fallbackGrade(args.answer, args.round, args.code, args.traceSummary);
   return { ...g, engine: "offline" };
 }
 

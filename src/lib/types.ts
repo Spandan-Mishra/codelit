@@ -66,3 +66,53 @@ export interface DebugRecord {
   secondsUsed: number;
   finishedAt: string | null;
 }
+
+// --- Phase 1: agent-assisted scenarios + trace recorder ---
+// All scenario data is JSON-serializable. A variant is a seeded shuffle of
+// numeric test params (see instantiateTests in scenarios.ts), never prose.
+
+export interface ScenarioStage {
+  title: string;
+  brief: string;
+  unlockHint: string;
+}
+
+export interface ScenarioVariants {
+  seedKeys: string[];
+  description?: string;
+}
+
+export interface Scenario {
+  id: string;
+  title: string;
+  difficulty: Difficulty;
+  tags: string[];
+  minutes: number;
+  promptPar: number;
+  timePar: number; // minutes; efficiency par, may differ from wall-clock limit
+  stages: ScenarioStage[]; // exactly 3, drip-fed
+  acceptance: TestCase[];
+  fnName: string;
+  variants: ScenarioVariants;
+  cppReturn?: "vec" | "vecvec" | "bool" | "int" | "groups";
+}
+
+export type TraceEventKind = "prompt" | "code" | "run" | "stage" | "hint";
+
+export interface TraceEvent {
+  t: number; // seconds since attempt start
+  kind: TraceEventKind;
+  text?: string;
+  passed?: boolean;
+  linesChanged?: number;
+}
+
+export interface AgentAttempt {
+  scenarioId: string;
+  variantSeed: number;
+  status: "active" | "finished" | "locked";
+  startedAt: number; // epoch ms
+  stageUnlocked: number; // 1-based
+  events: TraceEvent[];
+  cooldownUntil: number; // epoch ms, 0 = none
+}

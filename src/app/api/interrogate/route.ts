@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   const code = String(body.code || "");
   if (code.length > MAX_CODE) return NextResponse.json({ error: "Code too long — keep it under 12k characters." }, { status: 413 });
   const problem = body.problemId ? getProblem(body.problemId) : undefined;
+  const traceSummary = typeof body.traceSummary === "string" && body.traceSummary ? body.traceSummary.slice(0, 300) : undefined;
   if (body.action === "question") {
     const history = (Array.isArray(body.history) ? body.history : []).slice(-MAX_HISTORY);
     const out = await nextQuestion({
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
       code,
       fnName: String(body.fnName || problem?.fnName || "solve").slice(0, 64),
       history,
+      traceSummary,
     });
     return NextResponse.json(out);
   }
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
       question: String(body.question || "").slice(0, 1000),
       answer,
       code,
+      traceSummary,
     });
     return NextResponse.json(out);
   }

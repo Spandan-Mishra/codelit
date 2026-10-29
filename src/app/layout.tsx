@@ -11,6 +11,7 @@ const NAV = [
   { href: "/practice", label: "Practice" },
   { href: "/arena", label: "Arena · Graded" },
   { href: "/debug", label: "Debug Under Fire" },
+  { href: "/scenarios", label: "Scenarios" },
   { href: "/passport", label: "Passport" },
 ];
 
