@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SCENARIOS } from "@/lib/scenarios";
+import AgentCta from "@/components/AgentCta";
 import { Timer, MessageSquareWarning, Swords, Fingerprint } from "lucide-react";
 
 export default function Home() {
@@ -57,6 +58,8 @@ export default function Home() {
         <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">Watch its progress live while you work. Beat it to earn credits toward harder difficulties.</p>
         <Link href="/duels" className="inline-block mt-4 font-ui text-sm px-4 py-2 rounded-md border border-[#3a3c37] hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Open duels →</Link>
       </section>
+
+      <AgentCta />
     </div>
   );
 }

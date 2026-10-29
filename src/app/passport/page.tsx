@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getName, setName } from "@/lib/store";
 import { verdictTier } from "@/lib/judge";
 import { DUELS_KEY, type DuelRecord } from "@/lib/duel";
+import { getActiveProviderLabel } from "@/lib/agentStore";
 import { ShieldCheck, Bot, Swords } from "lucide-react";
 
 interface AgentRunRecord {
@@ -44,11 +45,16 @@ export default function PassportPage() {
   const [duels, setDuels] = useState<DuelRecord[]>([]);
   const [name, setNameState] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [agentLabel, setAgentLabel] = useState("House Agent (free)");
+  const [agentModel, setAgentModel] = useState("house-guided");
 
   function refresh() {
     setAgentRuns(getAgentRuns());
     setDuels(getDuels());
     setNameState(getName());
+    const active = getActiveProviderLabel();
+    setAgentLabel(active.label);
+    setAgentModel(active.model);
     setLoaded(true);
   }
   useEffect(() => { const t = setTimeout(refresh, 0); return () => clearTimeout(t); }, []);
@@ -60,6 +66,13 @@ export default function PassportPage() {
     <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
       <h1 className="text-3xl tracking-tight">Credibility passport</h1>
       <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">Defended traces, not green ticks. This page fills up when you explain code under a clock.</p>
+      {loaded && (
+        <p className="font-ui text-sm text-[#9a968c] mt-2 flex items-center gap-2">
+          <Bot className="h-4 w-4 text-[#e8b33d]" />
+          Active agent: <span className="text-[#c9c5ba]">{agentLabel} · <span className="font-code text-[13px]">{agentModel}</span></span>
+          <Link href="/agents" className="text-[#e8b33d] hover:underline rounded">Manage →</Link>
+        </p>
+      )}
 
       {!loaded ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-[0.8fr_1.2fr] items-start" aria-busy="true" aria-label="Loading passport">

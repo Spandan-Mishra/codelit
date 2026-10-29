@@ -5,7 +5,9 @@ import Editor from "@/components/Editor";
 import { runTests, type RunResult } from "@/lib/runner";
 import { finalScore, provisionalScore, verdictTier } from "@/lib/judge";
 import type { DefendTurn, ScenarioStage, ScenarioStubs, TestCase } from "@/lib/types";
-import { Play, ShieldCheck, Timer, AlertTriangle, Lock, CheckCircle2 } from "lucide-react";
+import { getProvider } from "@/lib/agents";
+import { getAgentConfig, getAgentKeys } from "@/lib/agentStore";
+import { Play, ShieldCheck, Timer, AlertTriangle, Lock, CheckCircle2, Bot, ChevronDown } from "lucide-react";
 
 // Scenario.stages is always exactly 3; locked briefs stay server-side.
 const TOTAL_STAGES = 3;
@@ -113,6 +115,14 @@ export default function AgentClient(props: {
   const [prompts, setPrompts] = useState<string[]>([]);
   const [loggingPrompt, setLoggingPrompt] = useState(false);
 
+  const [assistOpen, setAssistOpen] = useState(false);
+  const [assistLoading, setAssistLoading] = useState(false);
+  const [assistReply, setAssistReply] = useState("");
+  const [assistEngine, setAssistEngine] = useState("");
+  const [assistError, setAssistError] = useState("");
+  const [assistPrompt, setAssistPrompt] = useState("");
+  const [assistLabel, setAssistLabel] = useState("House Agent (free)");
+
   const [results, setResults] = useState<RunResult[] | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState("");
@@ -208,6 +218,68 @@ export default function AgentClient(props: {
     }
     setPrompts((p) => [...p, text]);
     setPromptDraft("");
+  }
+
+  function toggleAssist() {
+    if (!assistOpen) {
+      const cfg = getAgentConfig();
+      setAssistLabel(getProvider(cfg.provider)?.label || "House Agent (free)");
+    }
+    setAssistOpen((o) => !o);
+  }
+
+  async function askAgent() {
+    if (assistLoading) return;
+    setAssistLoading(true);
+    setAssistError("");
+    setAssistReply("");
+    setAssistEngine("");
+    try {
+      const cfg = getAgentConfig();
+      const def = getProvider(cfg.provider);
+      setAssistLabel(def?.label || "House Agent (free)");
+      const keys = getAgentKeys();
+      const key = keys[cfg.provider] || "";
+      if (def?.needsKey && !key) {
+        setAssistError("No key saved for this provider — add one on the Agents page first.");
+        return;
+      }
+      const brief = stages.length ? stages[stages.length - 1].brief : "";
+      const system =
+        "You are a coding coach. Give a short hint (2-3 sentences): point at the likely bug or next step, ask one focusing question. Never write the full solution.";
+      const user =
+        `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}`.slice(0, 5500);
+      setAssistPrompt(user);
+      const res = await fetch("/api/agent-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: cfg.provider,
+          key: key || undefined,
+          baseUrl: cfg.baseUrl || undefined,
+          model: cfg.model,
+          system,
+          user,
+        }),
+      });
+      const data = (await res.json()) as { text?: string; engine?: string; error?: string };
+      if (!res.ok) {
+        setAssistError(typeof data.error === "string" ? data.error : `Server error ${res.status}`);
+        return;
+      }
+      setAssistReply(typeof data.text === "string" ? data.text : "");
+      setAssistEngine(typeof data.engine === "string" ? data.engine : "");
+    } catch (e) {
+      setAssistError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAssistLoading(false);
+    }
+  }
+
+  function logAssistPrompt() {
+    if (!assistPrompt) return;
+    setPromptDraft(assistPrompt);
+    setNotice("Assist prompt loaded into the prompt draft above — log it to count it.");
   }
 
   async function doRun() {
@@ -499,6 +571,46 @@ export default function AgentClient(props: {
                       </li>
                     ))}
                   </ol>
+                )}
+              </div>
+
+              <div className="mt-4 rounded-lg border border-[#262824] bg-[#141613] font-ui">
+                <button
+                  onClick={toggleAssist}
+                  aria-expanded={assistOpen}
+                  className="w-full flex items-center gap-2 px-5 py-3.5 text-sm font-semibold text-left"
+                >
+                  <Bot className="h-4 w-4 text-[#e8b33d]" />
+                  Ask my agent
+                  <span className="font-normal text-xs text-[#8a877d]">· {assistLabel}</span>
+                  <ChevronDown className={`h-4 w-4 ml-auto text-[#9a968c] transition-transform ${assistOpen ? "rotate-180" : ""}`} />
+                </button>
+                {assistOpen && (
+                  <div className="px-5 pb-5">
+                    <p className="text-xs text-[#8a877d] leading-5">
+                      Sends your current code and the stage brief to your configured agent.{" "}
+                      <Link href="/agents" className="text-[#e8b33d] hover:underline rounded">Manage providers →</Link>
+                    </p>
+                    <button
+                      onClick={() => void askAgent()}
+                      disabled={assistLoading}
+                      className="mt-3 px-4 py-2 rounded-md border border-[#3a3c37] text-sm disabled:opacity-40"
+                    >
+                      {assistLoading ? "Asking…" : "Ask for a hint"}
+                    </button>
+                    {assistError && <p className="text-sm text-red-300 mt-3">{assistError}</p>}
+                    {assistReply && (
+                      <div className="mt-3 rounded-md bg-black/40 border border-[#262824] px-3 py-2.5 text-[13px] text-[#b9b5a9] leading-6">
+                        {assistEngine && <p className="font-code text-xs text-[#8a877d] mb-1">{assistEngine}</p>}
+                        {assistReply}
+                        <div className="mt-2">
+                          <button onClick={logAssistPrompt} className="px-3 py-1.5 rounded-md border border-[#3a3c37] text-xs">
+                            Log prompt to trace
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
