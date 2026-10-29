@@ -91,8 +91,9 @@ export default function AgentClient(props: {
   fnName: string;
   stubs?: ScenarioStubs;
   cppReturn?: string;
+  onFinish?: (passed: boolean) => void;
 }) {
-  const { id, title, difficulty, tags, minutes, promptPar, timePar, fnName, stubs, cppReturn } = props;
+  const { id, title, difficulty, tags, minutes, promptPar, timePar, fnName, stubs, cppReturn, onFinish } = props;
   const [phase, setPhase] = useState<"loading" | "code" | "verdict" | "defend" | "done" | "blocked">("loading");
   const [blockedMsg, setBlockedMsg] = useState("");
   const [retryAfterSec, setRetryAfterSec] = useState<number | null>(null);
@@ -285,6 +286,7 @@ export default function AgentClient(props: {
         traceSummary: typeof data.traceSummary === "string" ? data.traceSummary : "",
       });
       setPhase("verdict");
+      onFinish?.(data.passed === true);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : String(e));
     } finally {

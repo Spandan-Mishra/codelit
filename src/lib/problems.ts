@@ -1,4 +1,4 @@
-import type { Problem, DebugChallenge } from "./types";
+import type { Problem } from "./types";
 
 export const PROBLEMS: Problem[] = [
   {
@@ -267,77 +267,6 @@ export const PROBLEMS: Problem[] = [
   },
 ];
 
-export const DEBUG_CHALLENGES: DebugChallenge[] = [
-  {
-    id: "binary-search-offbyone",
-    title: "Binary search never finds the last element",
-    difficulty: "Easy",
-    minutes: 6,
-    maxPrompts: 4,
-    description:
-      "This binary search passes most tests but returns -1 for the last element. You have 6 minutes and 4 prompts to the agent. Fix the code in the editor — the agent will not write the fix for you, it only hints.",
-    buggyPy: "def binary_search(arr, target):\n    lo, hi = 0, len(arr) - 1\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            lo = mid + 1\n        else:\n            hi = mid - 1\n    return -1\n",
-    fixedHint: "while lo <= hi",
-    tests: [
-      { input: "binary_search([1,2,3,4,5], 5)", expected: "4" },
-      { input: "binary_search([1,2,3,4,5], 1)", expected: "0" },
-      { input: "binary_search([1,2,3,4,5], 9)", expected: "-1" },
-    ],
-    fnName: "binary_search",
-  },
-  {
-    id: "two-sum-self-pair",
-    title: "Two Sum pairs an element with itself",
-    difficulty: "Medium",
-    minutes: 8,
-    maxPrompts: 4,
-    description:
-      "This solution returns [0,0] on some inputs. Find the ordering bug. 8 minutes, 4 prompts.",
-    buggyPy: "def two_sum(nums, target):\n    seen = {}\n    for i, n in enumerate(nums):\n        seen[n] = i\n    for i, n in enumerate(nums):\n        j = seen.get(target - n)\n        if j is not None:\n            return [i, j]\n    return []\n",
-    fixedHint: "check before insert / j != i",
-    tests: [
-      { input: "two_sum([3,2,4], 6)", expected: "[1, 2]" },
-      { input: "two_sum([2,7,11,15], 9)", expected: "[0, 1]" },
-    ],
-    fnName: "two_sum",
-  },
-  {
-    id: "interval-merge-sort",
-    title: "Merge intervals fails on unsorted input",
-    difficulty: "Medium",
-    minutes: 8,
-    maxPrompts: 5,
-    description: "The merge logic looks right but the challenge input is shuffled. 8 minutes, 5 prompts.",
-    buggyPy: "def merge(intervals):\n    out = []\n    for s, e in intervals:\n        if out and s <= out[-1][1]:\n            out[-1][1] = max(out[-1][1], e)\n        else:\n            out.append([s, e])\n    return out\n",
-    fixedHint: "sort by start first",
-    tests: [
-      { input: "merge([[8,10],[1,3],[2,6],[15,18]])", expected: "[[1, 6], [8, 10], [15, 18]]" },
-      { input: "merge([[1,4],[4,5]])", expected: "[[1, 5]]" },
-    ],
-    fnName: "merge",
-  },
-  {
-    id: "sum-skips-last",
-    title: "Total skips the last element",
-    difficulty: "Easy",
-    minutes: 6,
-    maxPrompts: 4,
-    description:
-      "This total() is always short by the last element's value — small inputs hide it, big ones don't. 6 minutes, 4 prompts.",
-    buggyPy: "def total(nums):\n    s = 0\n    for i in range(len(nums) - 1):\n        s += nums[i]\n    return s\n",
-    fixedHint: "range(len(nums)) — the - 1 drops the last index",
-    tests: [
-      { input: "total([1,2,3,4])", expected: "10" },
-      { input: "total([5])", expected: "5" },
-      { input: "total([])", expected: "0" },
-    ],
-    fnName: "total",
-  },
-];
-
 export function getProblem(id: string) {
   return PROBLEMS.find((p) => p.id === id);
-}
-export function getDebug(id: string) {
-  return DEBUG_CHALLENGES.find((d) => d.id === id);
 }

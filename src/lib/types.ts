@@ -27,19 +27,6 @@ export interface Problem {
   hints: string[];
 }
 
-export interface DebugChallenge {
-  id: string;
-  title: string;
-  difficulty: Difficulty;
-  minutes: number;
-  maxPrompts: number;
-  description: string;
-  buggyPy: string;
-  fixedHint: string;
-  tests: TestCase[];
-  fnName: string;
-}
-
 export interface DefendTurn {
   question: string;
   answer: string;
@@ -56,14 +43,6 @@ export interface AttemptRecord {
   codeScore: number;
   defendScore: number | null;
   turns: DefendTurn[];
-  finishedAt: string | null;
-}
-
-export interface DebugRecord {
-  challengeId: string;
-  status: "in-progress" | "solved" | "failed";
-  promptsUsed: number;
-  secondsUsed: number;
   finishedAt: string | null;
 }
 

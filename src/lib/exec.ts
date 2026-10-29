@@ -1,4 +1,4 @@
-// Shared local code runners. Used by /api/run (practice/arena/debug)
+// Shared local code runners. Used by /api/run and /api/agent-run.
 // and /api/agent-run (phase-1 scenario acceptance). Demo-grade isolation
 // (timeouts, temp dirs); harden before real users.
 

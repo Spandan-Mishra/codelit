@@ -184,21 +184,3 @@ export async function gradeAnswer(args: {
   const g = fallbackGrade(args.answer, args.round, args.code, args.traceSummary);
   return { ...g, engine: "offline" };
 }
-
-export async function debugHint(args: { title: string; buggy: string; code: string; promptsUsed: number }): Promise<{ hint: string; engine: string }> {
-  const live = await callMeta([
-    {
-      role: "system",
-      content: "You are a debugging coach. Give ONE hint that narrows the search without writing the fix. One or two sentences. Never output corrected code.",
-    },
-    { role: "user", content: `Challenge: ${args.title}\nOriginal buggy code:\n${args.buggy}\nStudent current code:\n${args.code}\nHints used so far: ${args.promptsUsed}` },
-  ]);
-  if (live) return { hint: live.trim(), engine: INTERROGATE_MODEL };
-  const hints = [
-    "Narrow it: run the smallest failing input by hand and write down lo/hi (or the map) at each step. The bug is a boundary or ordering slip, not a rewrite.",
-    "Compare what your loop condition allows vs what the last element needs. Check the exact comparison operator.",
-    "Look at the order of operations: do you record state before or after you check it? Swap the order mentally on the second example.",
-    "You are close. Print the intermediate collection right before the return on the failing case — the wrong value appears one step earlier than you think.",
-  ];
-  return { hint: hints[Math.min(args.promptsUsed, hints.length - 1)], engine: "offline" };
-}
