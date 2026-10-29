@@ -4,7 +4,7 @@ import Link from "next/link";
 import Editor from "@/components/Editor";
 import { runTests, type RunResult } from "@/lib/runner";
 import { finalScore, provisionalScore, verdictTier } from "@/lib/judge";
-import type { DefendTurn, ScenarioStage, TestCase } from "@/lib/types";
+import type { DefendTurn, ScenarioStage, ScenarioStubs, TestCase } from "@/lib/types";
 import { Play, ShieldCheck, Timer, AlertTriangle, Lock, CheckCircle2 } from "lucide-react";
 
 // Scenario.stages is always exactly 3; locked briefs stay server-side.
@@ -50,7 +50,12 @@ interface TraceEventOut {
   linesChanged?: number;
 }
 
-function starterFor(lang: "python" | "javascript" | "c++", fnName: string): string {
+function starterFor(lang: "python" | "javascript" | "c++", fnName: string, stubs?: ScenarioStubs): string {
+  if (stubs) {
+    if (lang === "python") return stubs.py;
+    if (lang === "javascript") return stubs.js;
+    return stubs.cpp;
+  }
   if (fnName === "two_sum") {
     if (lang === "python") return "def two_sum(nums, target):\n    # your code here\n    pass\n";
     if (lang === "javascript") return "function twoSum(nums, target) {\n  // your code here\n}\n";
@@ -84,8 +89,10 @@ export default function AgentClient(props: {
   promptPar: number;
   timePar: number;
   fnName: string;
+  stubs?: ScenarioStubs;
+  cppReturn?: string;
 }) {
-  const { id, title, difficulty, tags, minutes, promptPar, timePar, fnName } = props;
+  const { id, title, difficulty, tags, minutes, promptPar, timePar, fnName, stubs, cppReturn } = props;
   const [phase, setPhase] = useState<"loading" | "code" | "verdict" | "defend" | "done" | "blocked">("loading");
   const [blockedMsg, setBlockedMsg] = useState("");
   const [retryAfterSec, setRetryAfterSec] = useState<number | null>(null);
@@ -98,7 +105,7 @@ export default function AgentClient(props: {
   const lastT = useRef(0);
 
   const [lang, setLang] = useState<"python" | "javascript" | "c++">("python");
-  const [code, setCode] = useState(() => starterFor("python", fnName));
+  const [code, setCode] = useState(() => starterFor("python", fnName, stubs));
   const lastSnapshot = useRef("");
 
   const [promptDraft, setPromptDraft] = useState("");
@@ -184,7 +191,7 @@ export default function AgentClient(props: {
 
   function switchLang(next: "python" | "javascript" | "c++") {
     setLang(next);
-    setCode(starterFor(next, fnName));
+    setCode(starterFor(next, fnName, stubs));
   }
 
   async function logPrompt() {
@@ -208,7 +215,7 @@ export default function AgentClient(props: {
     setRunError("");
     setNotice("");
     try {
-      const out = await runTests({ language: lang, code, fnName, tests });
+      const out = await runTests({ language: lang, code, fnName, tests, cppReturn });
       if (out.error) setRunError(out.error);
       setResults(out.results);
       if (out.results.length === 0) return; // infra failure: don't pollute the trace

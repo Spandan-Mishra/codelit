@@ -9,7 +9,7 @@ import { limited, clientIp } from "@/lib/ratelimit";
 import { runPython, runJs, runCpp } from "@/lib/exec";
 import { getScenario, instantiateTests, visibleTests, STAGE_COUNT } from "@/lib/scenarios";
 import { validateEvent, efficiencyScore, summarizeTrace, parseStageNumber, MAX_EVENT_TEXT } from "@/lib/trace";
-import type { AgentAttempt, TraceEvent, TraceEventKind } from "@/lib/types";
+import type { AgentAttempt, Scenario, ScenarioStage, TraceEvent, TraceEventKind } from "@/lib/types";
 
 const attempts = new Map<string, AgentAttempt>();
 const COOLDOWN_MS = 10 * 60 * 1000;
@@ -23,6 +23,14 @@ function key(ip: string, scenarioId: string) {
   return `${ip}::${scenarioId}`;
 }
 
+// Stage briefs for an attempt: generative scenarios overlay the seeded briefs
+// from generate(seed) onto the static stage titles/unlock hints.
+function stagesFor(scenario: Scenario, seed: number): ScenarioStage[] {
+  if (!scenario.generate) return scenario.stages;
+  const briefs = scenario.generate(seed >>> 0).briefs;
+  return scenario.stages.map((s, i) => ({ ...s, brief: briefs[i] ?? s.brief }));
+}
+
 function publicState(a: AgentAttempt) {
   const scenario = getScenario(a.scenarioId);
   if (!scenario) return null;
@@ -31,7 +39,7 @@ function publicState(a: AgentAttempt) {
     scenarioId: a.scenarioId,
     variantSeed: a.variantSeed,
     stageUnlocked: a.stageUnlocked,
-    stages: scenario.stages.slice(0, a.stageUnlocked),
+    stages: stagesFor(scenario, a.variantSeed).slice(0, a.stageUnlocked),
     tests: visibleTests(scenario, a.variantSeed, a.stageUnlocked),
     startedAt: a.startedAt,
     cooldownUntil: a.cooldownUntil,
@@ -125,7 +133,7 @@ export async function POST(req: Request) {
           ok: true,
           stageUnlocked: attempt.stageUnlocked,
           unlocked: {
-            stage: scenario.stages[n - 1],
+            stage: stagesFor(scenario, attempt.variantSeed)[n - 1],
             tests: visibleTests(scenario, attempt.variantSeed, attempt.stageUnlocked),
           },
         });

@@ -60,6 +60,9 @@ export async function runPython(code: string, fnName: string, tests: TestCase[])
 // Python-style test expr -> C++ expr for our problem set:
 // [2,7] -> {2,7}, 's' -> "s", True -> true. String contents in our tests
 // hold no brackets, so a flat replace is enough for now.
+// Contract for generated suites: string literals must be double-quoted and
+// contain no '[' ']' brackets (or apostrophes), so this flat replace never
+// mangles string contents.
 function pyExprToCpp(expr: string): string {
   return expr.replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false").replace(/'/g, '"').replace(/\[/g, "{").replace(/\]/g, "}");
 }
@@ -69,10 +72,12 @@ using namespace std;
 string pvec(const vector<int>& v){string s="[";for(size_t i=0;i<v.size();i++){if(i)s+=", ";s+=to_string(v[i]);}return s+"]";}
 string pvecvec(const vector<vector<int>>& m){string s="[";for(size_t i=0;i<m.size();i++){if(i)s+=", ";s+=pvec(m[i]);}return s+"]";}
 string pgroups(vector<vector<string>> g){for(auto& x:g){sort(x.begin(),x.end());}sort(g.begin(),g.end());string s="groups:";for(size_t i=0;i<g.size();i++){if(i)s+=" | ";for(size_t j=0;j<g[i].size();j++){if(j)s+=",";s+=g[i][j];}}return s;}
+string pstr(const string& s){ostringstream o;o<<quoted(s);return o.str();}
 `;
 
 export async function runCpp(code: string, fnName: string, tests: TestCase[], ret: string): Promise<ExecResult[]> {
-  const printer = ret === "vecvec" ? "pvecvec" : ret === "int" ? "to_string" : ret === "groups" ? "pgroups" : "pvec";
+  const printer =
+    ret === "vecvec" ? "pvecvec" : ret === "int" ? "to_string" : ret === "groups" ? "pgroups" : ret === "str" ? "pstr" : "pvec";
   const dir = await mkdtemp(join(tmpdir(), "codelit-cpp-"));
   try {
     const calls = tests

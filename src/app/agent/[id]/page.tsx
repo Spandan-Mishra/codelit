@@ -26,6 +26,8 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
       promptPar={s.promptPar}
       timePar={s.timePar}
       fnName={s.fnName}
+      stubs={s.stubs}
+      cppReturn={s.cppReturn}
     />
   );
 }

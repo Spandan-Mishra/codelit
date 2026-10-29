@@ -14,6 +14,7 @@ export async function runTests(args: {
   fnName: string;
   tests: TestCase[];
   problemId?: string;
+  cppReturn?: string;
 }): Promise<{ results: RunResult[]; error?: string; engine: string }> {
   const res = await fetch("/api/run", {
     method: "POST",

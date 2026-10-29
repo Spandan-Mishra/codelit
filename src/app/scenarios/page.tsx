@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SCENARIOS } from "@/lib/scenarios";
+import { ALL_SCENARIOS as SCENARIOS } from "@/lib/scenarios";
 import { Bot, Timer, MessageSquare } from "lucide-react";
 
 export default function ScenariosPage() {

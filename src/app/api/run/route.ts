@@ -7,12 +7,13 @@ import type { TestCase } from "@/lib/types";
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { language, code, fnName, tests, problemId } = body as {
+  const { language, code, fnName, tests, problemId, cppReturn } = body as {
     language: "python" | "javascript" | "c++";
     code: string;
     fnName: string;
     tests: TestCase[];
     problemId?: string;
+    cppReturn?: string;
   };
   // Code execution is the abuse-sensitive path: cap volume and payload size.
   if (limited(`run:${clientIp(req)}`, 30)) {
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
   try {
     if (language === "javascript") return NextResponse.json({ results: runJs(code, fnName, tests), engine: "local-js" });
     if (language === "c++") {
-      const ret = (problemId && getProblem(problemId)?.cppReturn) || "vec";
+      const ret = cppReturn || (problemId && getProblem(problemId)?.cppReturn) || "vec";
       return NextResponse.json({ results: await runCpp(code, fnName, tests, ret), engine: "local-cpp" });
     }
     const results = await runPython(code, fnName, tests);

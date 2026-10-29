@@ -6,20 +6,12 @@
 // yields a valid suite.
 
 import type { Scenario, TestCase } from "./types";
+import { mulberry32 } from "./rand";
+import { VAULT_SCENARIOS, getVaultScenario } from "./vault/registry";
+
+export { mulberry32 };
 
 export const STAGE_COUNT = 3;
-
-// Deterministic PRNG (mulberry32): same seed -> same suite, every machine.
-export function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 // --- Pair-sum (two-sum core) ---
 // Uniform offset preserves solutions: (a+d)+(b+d) = t+2d iff a+b = t.
@@ -166,6 +158,11 @@ export const SCENARIOS: Scenario[] = [
       description: "Seeded uniform offset of nums/target; solution indices unchanged.",
     },
     cppReturn: "vec",
+    stubs: {
+      py: "def two_sum(nums, target):\n    # your code here\n    pass\n",
+      js: "function twoSum(nums, target) {\n  // your code here\n}\n",
+      cpp: "#include <vector>\nusing namespace std;\n\nvector<int> two_sum(vector<int> nums, int target) {\n    // your code here\n    return {};\n}\n",
+    },
   },
   {
     id: "agent-merge-intervals",
@@ -199,16 +196,24 @@ export const SCENARIOS: Scenario[] = [
       description: "Seeded uniform endpoint offset plus shuffled input order; merged cover shifts identically.",
     },
     cppReturn: "vecvec",
+    stubs: {
+      py: "def merge(intervals):\n    # your code here\n    pass\n",
+      js: "function merge(intervals) {\n  // your code here\n}\n",
+      cpp: "#include <vector>\nusing namespace std;\n\nvector<vector<int>> merge(vector<vector<int>> intervals) {\n    // your code here\n    return {};\n}\n",
+    },
   },
 ];
 
 export function getScenario(id: string): Scenario | undefined {
-  return SCENARIOS.find((s) => s.id === id);
+  return SCENARIOS.find((s) => s.id === id) ?? getVaultScenario(id);
 }
+
+export const ALL_SCENARIOS: Scenario[] = [...SCENARIOS, ...VAULT_SCENARIOS];
 
 // Full acceptance suite for a variant seed. Seed 0 is the canonical suite.
 export function instantiateTests(scenario: Scenario, seed: number): TestCase[] {
   const s = seed >>> 0;
+  if (scenario.generate) return scenario.generate(s).tests;
   if (scenario.id === "agent-two-sum") return pairSumTests(s);
   if (scenario.id === "agent-merge-intervals") return mergeTests(s);
   return scenario.acceptance;

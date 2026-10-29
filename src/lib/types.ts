@@ -21,7 +21,7 @@ export interface Problem {
   starterPy: string;
   starterJs: string;
   starterCpp: string;
-  cppReturn: "vec" | "vecvec" | "bool" | "int" | "groups";
+  cppReturn: "vec" | "vecvec" | "bool" | "int" | "groups" | "str";
   fnName: string;
   tests: TestCase[];
   hints: string[];
@@ -82,6 +82,12 @@ export interface ScenarioVariants {
   description?: string;
 }
 
+export interface ScenarioStubs {
+  py: string;
+  js: string;
+  cpp: string;
+}
+
 export interface Scenario {
   id: string;
   title: string;
@@ -94,7 +100,11 @@ export interface Scenario {
   acceptance: TestCase[];
   fnName: string;
   variants: ScenarioVariants;
-  cppReturn?: "vec" | "vecvec" | "bool" | "int" | "groups";
+  cppReturn?: "vec" | "vecvec" | "bool" | "int" | "groups" | "str";
+  stubs?: ScenarioStubs;
+  // Generative scenarios: seed -> 3 drip-fed stage briefs + full test suite.
+  // Seed 0 is the canonical suite (must equal `acceptance`).
+  generate?: (seed: number) => { briefs: [string, string, string]; tests: TestCase[] };
 }
 
 export type TraceEventKind = "prompt" | "code" | "run" | "stage" | "hint";
