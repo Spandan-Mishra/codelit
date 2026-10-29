@@ -4,6 +4,7 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { outputsMatch } from "@/lib/runner";
+import { friendlyRunError } from "@/lib/errors";
 import { getProblem } from "@/lib/problems";
 import { limited, clientIp } from "@/lib/ratelimit";
 import type { TestCase } from "@/lib/types";
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
   } catch (e) {
     return NextResponse.json({
       results: tests.map((t) => ({ input: t.input, expected: t.expected, actual: "", passed: false, hidden: t.hidden })),
-      error: `Run failed: ${e instanceof Error ? e.message : String(e)}`,
+      error: friendlyRunError(e instanceof Error ? e.message : String(e)),
       engine: "local-error",
     });
   }

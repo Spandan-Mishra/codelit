@@ -12,6 +12,7 @@ export default function DebugClient({ id }: { id: string }) {
   const [code, setCode] = useState(ch?.buggyPy ?? "");
   const [results, setResults] = useState<RunResult[] | null>(null);
   const [running, setRunning] = useState(false);
+  const [runError, setRunError] = useState("");
   const [promptsUsed, setPromptsUsed] = useState(0);
   const [hints, setHints] = useState<string[]>([]);
   const [hintLoading, setHintLoading] = useState(false);
@@ -43,15 +44,18 @@ export default function DebugClient({ id }: { id: string }) {
   if (!ch) return <div className="mx-auto max-w-4xl px-4 py-16 font-ui">Challenge not found. <Link className="text-[#e8b33d]" href="/debug">Back</Link></div>;
 
   async function doRun() {
-    setRunning(true);
+    setRunning(true); setRunError("");
     try {
       const out = await runTests({ language: "python", code, fnName: ch!.fnName, tests: ch!.tests });
+      if (out.error) setRunError(out.error);
       setResults(out.results);
       if (out.results.length && out.results.every((r) => r.passed)) {
         doneRef.current = true;
         setDone("solved");
         saveDebug({ challengeId: ch!.id, status: "solved", promptsUsed, secondsUsed: Math.round((Date.now() - startRef.current) / 1000), finishedAt: new Date().toISOString() });
       }
+    } catch (e) {
+      setRunError(String(e));
     } finally { setRunning(false); }
   }
 
@@ -83,6 +87,7 @@ export default function DebugClient({ id }: { id: string }) {
             <button onClick={doRun} disabled={running || done !== null} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-white text-black font-semibold text-sm disabled:opacity-50"><Play className="h-4 w-4" /> {running ? "Running…" : "Run tests"}</button>
             <button onClick={askHint} disabled={promptsUsed >= ch.maxPrompts || hintLoading || done !== null} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md border border-[#e8b33d]/60 text-[#e8b33d] font-semibold text-sm disabled:opacity-40"><Lightbulb className="h-4 w-4" /> {hintLoading ? "Thinking…" : `Ask agent (${ch.maxPrompts - promptsUsed} left)`}</button>
           </div>
+          {runError && <p className="font-ui text-sm text-red-300 mt-3">{runError}</p>}
           {results && <div className="mt-4 rounded-lg border border-[#262824] overflow-hidden"><div className="font-ui text-sm px-4 py-2.5 bg-[#141613] border-b border-[#262824]">{results.filter((r) => r.passed).length}/{results.length} passed</div><div className="divide-y divide-[#262824] font-code text-[13px]">{results.map((r, i) => <div key={i} className="px-4 py-2.5 flex flex-wrap gap-x-4"><span className={r.passed ? "text-emerald-300" : "text-red-300"}>{r.passed ? "PASS" : "FAIL"}</span><span className="text-[#9a968c]">{r.input}</span><span>expected {r.expected}</span><span>got {r.actual || "—"}</span></div>)}</div></div>}
           {done === "solved" && <div className="mt-4 font-ui rounded-md border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm">Solved with {promptsUsed} prompt(s). Saved to your passport.</div>}
           {done === "failed" && <div className="mt-4 font-ui rounded-md border border-red-400/30 bg-red-400/10 px-4 py-3 text-sm">Time expired. Retry from the list.</div>}

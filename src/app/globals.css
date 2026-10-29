@@ -23,3 +23,13 @@ body {
 .font-ui { font-family: ui-sans-system, system-ui, -apple-system, "Segoe UI", sans-serif; }
 .font-code { font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace; }
 ::selection { background: #e8b33d; color: #0c0d0b; }
+:focus-visible {
+  outline: 2px solid #e8b33d;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
