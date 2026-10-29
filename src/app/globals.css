@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0c0d0b;
+  --foreground: #ece9e2;
+  --accent: #e8b33d;
+  --panel: #141613;
+  --line: #262824;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: ui-sans-system, system-ui, sans-serif;
+  --font-mono: ui-monospace, "JetBrains Mono", Menlo, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Georgia, "Times New Roman", serif;
+}
+.font-ui { font-family: ui-sans-system, system-ui, -apple-system, "Segoe UI", sans-serif; }
+.font-code { font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace; }
+::selection { background: #e8b33d; color: #0c0d0b; }
