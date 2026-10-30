@@ -47,8 +47,9 @@ export default function NativeSetupGuide() {
           <Cmd>codex login</Cmd>
         </li>
         <li>
-          <p><strong className="text-white flex items-center gap-1.5"><UserRound className="h-4 w-4" /> 3. Get the connector.</strong> <span className="text-[#9a968c]">It lives in the Codelit repo:</span></p>
-          <Cmd>cd codelit/connector && chmod +x bin/codelit-connect.mjs</Cmd>
+          <p><strong className="text-white flex items-center gap-1.5"><UserRound className="h-4 w-4" /> 3. Install the connector command.</strong> <span className="text-[#9a968c]">It lives in the Codelit repo — this puts <span className="font-code text-[13px]">codelit-connect</span> on your PATH:</span></p>
+          <Cmd>cd codelit/connector && ./install.sh</Cmd>
+          <p className="text-[#9a968c] mt-1">No npm? Run it directly instead: <span className="font-code text-[13px]">node bin/codelit-connect.mjs …</span> from that folder.</p>
         </li>
         <li>
           <p><strong className="text-white">4. Pair this machine.</strong> <span className="text-[#9a968c]">Click “Pair a new device” above, then enter the one-time code here:</span></p>

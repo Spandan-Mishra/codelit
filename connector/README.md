@@ -7,9 +7,13 @@ interface; your agent supplies its runtime, login, and tools. No dependencies â€
 
 ```bash
 cd connector
-chmod +x bin/codelit-connect.mjs
-# optional: link it
-npm link   # or: alias codelit-connect="$PWD/bin/codelit-connect.mjs"
+./install.sh   # npm link: puts `codelit-connect` on your PATH
+```
+
+No npm? Run it directly from this folder instead:
+
+```bash
+node bin/codelit-connect.mjs status
 ```
 
 You also need the agent itself: `codex` on PATH with `codex login` done (subscription or API
