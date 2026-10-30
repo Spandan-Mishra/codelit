@@ -114,6 +114,20 @@ async function cmdRun() {
   }
   const client = createRelayClient({ relay, deviceId: cred.deviceId, token: cred.token });
   const sessions = await loadSessions();
+  // Credential rotation self-heal: after re-pairing, the stored per-attempt
+  // device ids may point at the previous device while this run polls as the
+  // new one. Rebind (threads are unaffected) so events attribute correctly.
+  let rebound = false;
+  for (const s of Object.values(sessions)) {
+    if (s && s.deviceId !== cred.deviceId) {
+      s.deviceId = cred.deviceId;
+      rebound = true;
+    }
+  }
+  if (rebound) {
+    await saveSessions(sessions);
+    console.log("[codelit-connect] rebound local sessions to the current device.");
+  }
 
   // Crash recovery: any turn left in-flight was NOT auto-resent. Report it.
   for (const [attemptId, s] of Object.entries(sessions)) {
