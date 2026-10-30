@@ -183,6 +183,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true, stage: attempt.stage });
   }
 
+  // --- reopen: recover from a stuck freeze back to solving. Only valid
+  // while no acceptance is banked; the next finish re-freezes from scratch.
+  if (op === "reopen") {
+    if (attempt.status !== "finishing" || attempt.acceptance) {
+      return NextResponse.json({ error: "Nothing to reopen." }, { status: 409 });
+    }
+    attempt.status = "open";
+    await saveAttempt(attempt);
+    await recordServerEvent(attempt.id, attempt.deviceId, attempt.nativeSessionId, null, "session.replaced", {
+      reason: "reopened after stuck freeze",
+    });
+    return NextResponse.json({ ok: true });
+  }
+
   // --- finish: freeze -> evaluate uploaded bytes -> banked acceptance ---
   if (op === "finish") {
     if (attempt.acceptance) return NextResponse.json({ ok: true, acceptance: attempt.acceptance });

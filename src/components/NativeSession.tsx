@@ -66,7 +66,6 @@ export default function NativeSession({ attemptId }: Props) {
   const [finishing, setFinishing] = useState(false);
   const [nowMs, setNowMs] = useState(0);
   const sinceRef = useRef(-1);
-  const finishTries = useRef(0);
 
   const load = useCallback(async () => {
     try {
@@ -111,11 +110,26 @@ export default function NativeSession({ attemptId }: Props) {
   const shownCode = dirty ? code : latestContent || code;
   const revAdvancedOverEdits = dirty && latestContent !== "" && latestContent !== code;
 
-  // Auto-complete the two-phase finish once the snapshot lands.
+  // Auto-complete the two-phase finish once the snapshot lands. This runs on
+  // its own interval OUTSIDE the poll cycle: the old timeout version was
+  // reset by every 3s event poll (fresh attempt object) and never fired.
+  const finishCtl = useRef({ active: false, tries: 0 });
   useEffect(() => {
-    if (!finishing || !attempt || attempt.acceptance || finishTries.current >= 8) return;
-    const t = setTimeout(async () => {
-      finishTries.current += 1;
+    if (!finishing || finishCtl.current.active) return;
+    finishCtl.current = { active: true, tries: 0 };
+    const t = setInterval(async () => {
+      const ctl = finishCtl.current;
+      if (!ctl.active) {
+        clearInterval(t);
+        return;
+      }
+      if (ctl.tries >= 8) {
+        ctl.active = false;
+        clearInterval(t);
+        setNotice("The frozen snapshot never arrived — the connector may be offline. Keep solving, or retry Finish.");
+        return;
+      }
+      ctl.tries += 1;
       try {
         const res = await fetch("/api/native/session", {
           method: "POST",
@@ -123,14 +137,23 @@ export default function NativeSession({ attemptId }: Props) {
           body: JSON.stringify({ op: "finish", attemptId }),
         });
         const data = await res.json();
-        if (res.ok && data.acceptance) setFinishing(false);
+        if (!res.ok) {
+          setNotice(typeof data.error === "string" ? data.error : `Server error ${res.status}`);
+        } else if (data.acceptance) {
+          ctl.active = false;
+          clearInterval(t);
+          setFinishing(false);
+        }
       } catch {
         /* retry on next tick */
       }
       void load();
     }, 5000);
-    return () => clearTimeout(t);
-  }, [finishing, attempt, attemptId, load]);
+    return () => {
+      clearInterval(t);
+      finishCtl.current.active = false;
+    };
+  }, [finishing, attemptId, load]);
 
   async function post(op: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
@@ -166,10 +189,18 @@ export default function NativeSession({ attemptId }: Props) {
   }
 
   async function finish() {
-    finishTries.current = 0;
+    finishCtl.current = { active: false, tries: 0 };
     const data = await post("finish", {});
     if (data && data.ok && data.freezing && !data.acceptance) setFinishing(true);
     if (data && data.ok && data.acceptance) setFinishing(false);
+  }
+
+  async function reopen() {
+    const data = await post("reopen", {});
+    if (data && data.ok) {
+      finishCtl.current = { active: false, tries: 0 };
+      setFinishing(false);
+    }
   }
 
   const decided = new Set(
@@ -317,9 +348,14 @@ export default function NativeSession({ attemptId }: Props) {
       </div>
 
       {attempt?.status === "finishing" && !attempt.acceptance && (
-        <p className="mt-4 font-ui text-sm text-[#9a968c] flex items-center gap-2">
-          <OctagonX className="h-4 w-4" /> Waiting for the agent to go idle and the frozen snapshot — keep this page open.
-        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <p className="font-ui text-sm text-[#9a968c] flex items-center gap-2">
+            <OctagonX className="h-4 w-4" /> Waiting for the agent to go idle and the frozen snapshot — keep this page open.
+          </p>
+          <button onClick={() => void reopen()} disabled={busy} className="font-ui text-xs px-3 py-1.5 rounded-md border border-[#3a3c37] disabled:opacity-50">
+            Keep solving instead
+          </button>
+        </div>
       )}
     </div>
   );

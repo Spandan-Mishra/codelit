@@ -224,6 +224,11 @@ async function cmdRun() {
         await client.queue(wrapEvent({ type: "message.final", payload: { text: "Nothing to submit — the solution file is empty." } }, ctxFor(attemptId)));
         return;
       }
+      if (wr.rev === 0) {
+        // The file never changed since the starter: the agent likely answered
+        // in chat without editing. Freeze anyway (honest evaluation), but say so.
+        await client.queue(wrapEvent({ type: "message.final", payload: { text: "Heads up: solution file unchanged since the starter — the agent never edited it. Freezing these bytes; they will likely fail acceptance." } }, ctxFor(attemptId)));
+      }
       await emitFileRevision(attemptId, dir, (s.context || {}).language || "python");
       const up = await client.uploadSnapshot(attemptId, {
         path: `solution${(s.context || {}).language === "python" ? ".py" : (s.context || {}).language === "c++" ? ".cpp" : ".js"}`,
