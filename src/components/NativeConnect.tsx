@@ -4,6 +4,7 @@
 // the agent's credentials. Experimental.
 
 "use client";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Cable, MonitorDown, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import type { AdapterCapabilities } from "@/lib/native/protocol";
@@ -17,16 +18,26 @@ interface Device {
   revokedAt: number | null;
 }
 
+function seenAgo(ts: number, nowMs: number): string {
+  const s = Math.max(0, Math.floor((nowMs - ts) / 1000));
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
 export default function NativeConnect() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [ticket, setTicket] = useState<{ ticketId: string; code: string; expiresAt: number } | null>(null);
   const [claimed, setClaimed] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [nowMs, setNowMs] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     try {
+      setNowMs(Date.now());
       const res = await fetch("/api/native/devices");
       const data = await res.json();
       if (res.ok && Array.isArray(data.devices)) setDevices(data.devices);
@@ -82,6 +93,7 @@ export default function NativeConnect() {
           if (!s.ok) {
             stopPoll();
             setTicket(null);
+            setError("That code expired or was already used — create a new one.");
           }
         } catch {
           /* keep waiting */
@@ -130,6 +142,7 @@ export default function NativeConnect() {
               <span className="font-semibold">{d.label}</span>
               <span className="text-[#9a968c] text-xs">
                 {d.adapters.map((a) => `${a.adapter}${a.validated ? "" : " (unvalidated)"}`).join(", ") || "no agents reported"}
+                {" · seen "}{seenAgo(d.lastSeenAt, nowMs)}
               </span>
               <button onClick={() => void revoke(d.deviceId)} className="ml-auto text-xs text-[#9a968c] hover:text-red-300 flex items-center gap-1">
                 <Trash2 className="h-3.5 w-3.5" /> Revoke
@@ -160,7 +173,11 @@ codelit-connect pair --relay {typeof window !== "undefined" ? window.location.or
           </button>
         </div>
       )}
-      {claimed && <p className="mt-3 font-ui text-sm text-emerald-300">Device paired. Pick it when you start a scenario.</p>}
+      {claimed && (
+        <p className="mt-3 font-ui text-sm text-emerald-300">
+          Device paired. <Link href="/native" className="underline underline-offset-2">Start solving →</Link>
+        </p>
+      )}
       {error && <p className="mt-3 font-ui text-sm text-[#e8b33d]">{error}</p>}
     </div>
   );

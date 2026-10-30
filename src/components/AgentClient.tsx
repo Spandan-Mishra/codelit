@@ -8,13 +8,10 @@ import type { BoardResult } from "@/lib/leaderboard";
 import { runTests, type RunResult } from "@/lib/runner";
 import { finalScore, provisionalScore, verdictTier } from "@/lib/judge";
 import type { DefendTurn, ScenarioStage, ScenarioStubs, TestCase } from "@/lib/types";
-import { getProvider } from "@/lib/agents";
-import { getAgentConfig, getAgentKeys } from "@/lib/agentStore";
-import { Play, ShieldCheck, Timer, AlertTriangle, Lock, CheckCircle2, Bot, ChevronDown } from "lucide-react";
+import { Play, ShieldCheck, Timer, AlertTriangle, Lock, CheckCircle2, Bot } from "lucide-react";
 
 // Scenario.stages is always exactly 3; locked briefs stay server-side.
 const TOTAL_STAGES = 3;
-const PROMPT_BUDGET = 12;
 const DEFEND_SECONDS = 90;
 const AGENT_RUNS_KEY = "codelit:agent-runs";
 
@@ -118,17 +115,6 @@ export default function AgentClient(props: {
   const [code, setCode] = useState(() => starterFor("python", fnName, stubs));
   const lastSnapshot = useRef("");
 
-  const [prompts, setPrompts] = useState<string[]>([]);
-
-  const [assistOpen, setAssistOpen] = useState(true);
-  const [assistLoading, setAssistLoading] = useState(false);
-  const [assistReply, setAssistReply] = useState("");
-  const [assistEngine, setAssistEngine] = useState("");
-  const [assistError, setAssistError] = useState("");
-  const [assistLabel, setAssistLabel] = useState("House Agent (free)");
-  const [assistInput, setAssistInput] = useState("");
-  const [assistHistory, setAssistHistory] = useState<{ role: "you" | "agent"; text: string }[]>([]);
-
   const [results, setResults] = useState<RunResult[] | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState("");
@@ -209,76 +195,6 @@ export default function AgentClient(props: {
   function switchLang(next: "python" | "javascript" | "c++") {
     setLang(next);
     setCode(starterFor(next, fnName, stubs));
-  }
-
-  function toggleAssist() {
-    if (!assistOpen) {
-      const cfg = getAgentConfig();
-      setAssistLabel(getProvider(cfg.provider)?.label || "House Agent (free)");
-    }
-    setAssistOpen((o) => !o);
-  }
-
-  async function askAgent() {
-    if (assistLoading) return;
-    setAssistLoading(true);
-    setAssistError("");
-    setAssistReply("");
-    setAssistEngine("");
-    try {
-      const cfg = getAgentConfig();
-      const def = getProvider(cfg.provider);
-      setAssistLabel(def?.label || "House Agent (free)");
-      const keys = getAgentKeys();
-      const key = keys[cfg.provider] || "";
-      if (def?.needsKey && !key) {
-        setAssistError("No key saved for this provider — add one on the Agents page first.");
-        return;
-      }
-      const brief = stages.length ? stages[stages.length - 1].brief : "";
-      const system =
-        "You are a coding coach. Give a short hint (2-3 sentences): point at the likely bug or next step, ask one focusing question. Never write the full solution.";
-      const typed = assistInput.trim();
-      const user = (
-        typed
-          ? `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}\nMy question: ${typed}`
-          : `Stage ${stageUnlocked} brief: ${brief}\nLanguage: ${lang}\nCode:\n${code}`
-      ).slice(0, 5500);
-      if (typed) setAssistHistory((h) => [...h, { role: "you", text: typed }]);
-      setAssistInput("");
-      const res = await fetch("/api/agent-proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          provider: cfg.provider,
-          key: key || undefined,
-          baseUrl: cfg.baseUrl || undefined,
-          model: cfg.model,
-          system,
-          user,
-        }),
-      });
-      const data = (await res.json()) as { text?: string; engine?: string; error?: string };
-      if (!res.ok) {
-        setAssistError(typeof data.error === "string" ? data.error : `Server error ${res.status}`);
-        return;
-      }
-      const replyText = typeof data.text === "string" ? data.text : "";
-      setAssistReply(replyText);
-      if (replyText) setAssistHistory((h) => [...h, { role: "agent", text: replyText }]);
-      setAssistEngine(typeof data.engine === "string" ? data.engine : "");
-      const pev = await sendEvent({ t: nowT(), kind: "prompt", text: user.slice(0, 4000) });
-      if (!pev.ok) {
-        setNotice(`Prompt NOT captured: ${pev.error} — it does not count toward your trace.`);
-      } else {
-        setPrompts((p) => [...p, user]);
-        if (replyText) await sendEvent({ t: nowT(), kind: "reply", text: replyText.slice(0, 4000) });
-      }
-    } catch (e) {
-      setAssistError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAssistLoading(false);
-    }
   }
 
   async function doRun() {
@@ -552,56 +468,23 @@ export default function AgentClient(props: {
 
         <div>
           {phase === "code" && (
-              <div className="mt-4 rounded-lg border border-[#262824] bg-[#141613] font-ui">
-                <button
-                  onClick={toggleAssist}
-                  aria-expanded={assistOpen}
-                  className="w-full flex items-center gap-2 px-5 py-3.5 text-sm font-semibold text-left"
+              <div className="mt-4 rounded-lg border border-[#e8b33d]/40 bg-[#141613] p-5 font-ui">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-[#e8b33d]" /> Your agent
+                </p>
+                <p className="text-xs text-[#8a877d] mt-2 leading-5">
+                  This solo run has no built-in hints. Pair your own coding agent and solve with
+                  chat, edits, and approvals — every turn lands in your trace.
+                </p>
+                <Link
+                  href="/native"
+                  className="inline-block mt-3 px-4 py-2 rounded-md bg-[#e8b33d] text-black font-semibold text-sm"
                 >
-                  <Bot className="h-4 w-4 text-[#e8b33d]" />
-                  Agent chat
-                  <span className="font-normal text-xs text-[#8a877d]">· {assistLabel}</span>
-                  <ChevronDown className={`h-4 w-4 ml-auto text-[#9a968c] transition-transform ${assistOpen ? "rotate-180" : ""}`} />
-                </button>
-                {assistOpen && (
-                  <div className="px-5 pb-5">
-                    <p className="text-xs text-[#8a877d] leading-5">
-                      Talk to your configured agent — every message carries your current code and the stage brief.{" "}
-                      <Link href="/agents" className="text-[#e8b33d] hover:underline rounded">Manage providers →</Link>
-                    </p>
-                    {assistHistory.length > 0 && (
-                      <ol className="mt-3 space-y-2 max-h-64 overflow-y-auto">
-                        {assistHistory.map((m, i) => (
-                          <li key={i} className={`rounded-md border px-3 py-2 text-[13px] leading-6 ${m.role === "you" ? "bg-white/5 border-[#3a3c37] text-[#ddd9cf]" : "bg-black/40 border-[#262824] text-[#b9b5a9]"}`}>
-                            <span className="font-code text-[11px] text-[#8a877d] block mb-0.5">{m.role === "you" ? "YOU" : assistLabel.toUpperCase()}</span>
-                            {m.text.length > 400 ? `${m.text.slice(0, 400)}…` : m.text}
-                          </li>
-                        ))}
-                      </ol>
-                    )}
-                    {assistEngine && assistReply && <p className="font-code text-[11px] text-[#8a877d] mt-2">via {assistEngine}</p>}
-                    {assistError && <p className="text-sm text-red-300 mt-3">{assistError}</p>}
-                    <div className="mt-3 flex gap-2">
-                      <label htmlFor="assist-input" className="sr-only">Message your agent</label>
-                      <input
-                        id="assist-input"
-                        value={assistInput}
-                        onChange={(e) => setAssistInput(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !assistLoading) void askAgent(); }}
-                        placeholder="Ask about your code, or send empty for a hint…"
-                        className="flex-1 min-w-0 rounded-md bg-black/50 border border-[#3a3c37] px-3 py-2 text-sm outline-none focus:border-[#e8b33d]"
-                      />
-                      <button
-                        onClick={() => void askAgent()}
-                        disabled={assistLoading}
-                        className="shrink-0 px-4 py-2 rounded-md bg-[#e8b33d] text-black font-semibold text-sm disabled:opacity-40"
-                      >
-                        {assistLoading ? "Asking…" : "Send"}
-                      </button>
-                    </div>
-                    <p className="font-ui text-[11px] text-[#8a877d] mt-2">Every exchange above is already in your trace.</p>
-                  </div>
-                )}
+                  Solve with my agent →
+                </Link>
+                <p className="text-[11px] text-[#8a877d] mt-2">
+                  <Link href="/agents" className="text-[#e8b33d] hover:underline rounded">Setup guide →</Link>
+                </p>
               </div>
 
           )}
@@ -610,23 +493,6 @@ export default function AgentClient(props: {
         <div>
           {phase === "code" && (
             <>
-              <div className="rounded-lg border border-[#262824] bg-[#141613] p-5">
-                <div className="flex items-center justify-between font-ui text-sm">
-                  <span className="font-semibold">Prompt log</span>
-                  <span className="font-code text-xs text-[#9a968c]">{prompts.length} / {PROMPT_BUDGET} this session</span>
-                </div>
-                <p className="font-ui text-xs text-[#8a877d] mt-1.5 leading-5">Captured automatically from the agent chat — what you send is what counts. An empty trace caps your score.</p>
-                {prompts.length > 0 && (
-                  <ol className="mt-3 space-y-1.5 font-ui text-[13px] text-[#b9b5a9]">
-                    {prompts.map((p, i) => (
-                      <li key={i} className="rounded-md bg-black/40 border border-[#262824] px-3 py-2">
-                        <span className="text-[#8a877d]">#{i + 1}</span> {p.length > 160 ? `${p.slice(0, 160)}…` : p}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </div>
-
               <div className="mt-4 flex items-center gap-2 font-ui text-sm">
                 <button onClick={() => switchLang("python")} className={`px-3 py-1.5 rounded-md border ${lang === "python" ? "bg-[#e8b33d] text-black font-semibold border-transparent" : "border-[#3a3c37]"}`}>Python</button>
                 <button onClick={() => switchLang("c++")} className={`px-3 py-1.5 rounded-md border ${lang === "c++" ? "bg-[#e8b33d] text-black font-semibold border-transparent" : "border-[#3a3c37]"}`}>C++</button>
