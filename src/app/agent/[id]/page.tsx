@@ -1,11 +1,11 @@
 import Link from "next/link";
-import AgentClient from "@/components/AgentClient";
+import { redirect } from "next/navigation";
 import { getScenario } from "@/lib/scenarios";
 
 export const instant = false;
 
-// Thin server wrapper: only display metadata crosses to the client.
-// Stage briefs and tests always come from /api/agent-run at runtime.
+// Single-flow UX: scenarios solve directly at /native?scenario=<id>, so this
+// route intentionally stays a redirect and must not grow a second solve page.
 export default async function AgentPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const s = getScenario(id);
@@ -16,18 +16,5 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
       </div>
     );
   }
-  return (
-    <AgentClient
-      id={s.id}
-      title={s.title}
-      difficulty={s.difficulty}
-      tags={s.tags}
-      minutes={s.minutes}
-      promptPar={s.promptPar}
-      timePar={s.timePar}
-      fnName={s.fnName}
-      stubs={s.stubs}
-      cppReturn={s.cppReturn}
-    />
-  );
+  redirect(`/native?scenario=${encodeURIComponent(s.id)}`);
 }

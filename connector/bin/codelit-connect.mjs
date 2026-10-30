@@ -13,13 +13,10 @@ import readline from "node:readline";
 import * as codex from "../lib/codex.mjs";
 import * as claude from "../lib/claude.mjs";
 import { claimPairingCode, createRelayClient, loadCred, saveCred } from "../lib/relay.mjs";
-import {
-  applyBrowserEdit, attemptDir, initAttempt, readSolution,
-  recordAgentWrite, runVisible, safeJoin, setInFlight,
-} from "../lib/workspace.mjs";
+import { configDir } from "../lib/config.mjs";
+import { createAttemptRuntime } from "../lib/runtime.mjs";
 
 const ADAPTERS = { codex, claude };
-const PROTOCOL_V = 1;
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -28,14 +25,28 @@ function arg(name) {
 const has = (name) => process.argv.includes(name);
 
 function sessionsPath() {
-  return path.join(os.homedir(), ".codelit", "sessions.json");
+  return path.join(configDir(), "sessions.json");
 }
 async function loadSessions() {
-  try { return JSON.parse(await fs.readFile(sessionsPath(), "utf8")); } catch { return {}; }
+  try {
+    const sessions = JSON.parse(await fs.readFile(sessionsPath(), "utf8"));
+    if (!sessions || typeof sessions !== "object" || Array.isArray(sessions)) throw new Error("Invalid saved connector sessions");
+    return sessions;
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw new Error("Cannot read saved connector sessions. Preserve sessions.json and repair it before running; no data was reset.");
+  }
 }
-async function saveSessions(s) {
-  await fs.mkdir(path.dirname(sessionsPath()), { recursive: true });
-  await fs.writeFile(sessionsPath(), JSON.stringify(s));
+let sessionWriteTail = Promise.resolve();
+function saveSessions(s) {
+  const bytes = JSON.stringify(s);
+  sessionWriteTail = sessionWriteTail.catch(() => {}).then(async () => {
+    await fs.mkdir(path.dirname(sessionsPath()), { recursive: true, mode: 0o700 });
+    const tmp = `${sessionsPath()}.tmp-${process.pid}`;
+    await fs.writeFile(tmp, bytes, { mode: 0o600 });
+    await fs.rename(tmp, sessionsPath());
+  });
+  return sessionWriteTail;
 }
 
 async function confirm(question) {
@@ -50,7 +61,7 @@ async function cmdStatus() {
   for (const [name, a] of Object.entries(ADAPTERS)) {
     const d = await a.detect();
     const c = await a.capabilities();
-    console.log(`${name}: ${d.found ? `found (${d.version})` : `missing — ${d.hint}`} | validated=${c.validated}`);
+    console.log(`${name}: ${c.status} | installed=${c.installed} | ready=${c.ready} | ${d.version || "missing"}\n  ${c.message}\n  models: ${c.models.map((m) => `${m.id} (${m.label})`).join(", ") || "none"}`);
   }
 }
 
@@ -85,25 +96,6 @@ async function cmdPair() {
   console.log(`paired as device ${r.data.deviceId}. Credential stored with mode 0600. Now run: codelit-connect run --relay ${relay}`);
 }
 
-function wrapEvent(ev, ctx) {
-  return {
-    v: PROTOCOL_V,
-    id: `ev_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e6)}`,
-    attemptId: ctx.attemptId,
-    deviceId: ctx.deviceId,
-    nativeSessionId: ctx.threadId,
-    turnId: ev.turnId || ctx.turnId || null,
-    parentId: null,
-    type: ev.type,
-    source: "connector",
-    sourceSeq: -1, // relay client assigns
-    sourceTime: ev.sourceTime || Date.now(),
-    adapter: ev.adapter || ctx.adapter,
-    model: ev.model || null,
-    payload: ev.payload || {},
-  };
-}
-
 async function cmdRun() {
   const relayFlag = arg("--relay");
   const cred = await loadCred();
@@ -114,166 +106,55 @@ async function cmdRun() {
   }
   const client = createRelayClient({ relay, deviceId: cred.deviceId, token: cred.token });
   const sessions = await loadSessions();
-  // Credential rotation self-heal: after re-pairing, the stored per-attempt
-  // device ids may point at the previous device while this run polls as the
-  // new one. Rebind (threads are unaffected) so events attribute correctly.
-  let rebound = false;
-  for (const s of Object.values(sessions)) {
-    if (s && s.deviceId !== cred.deviceId) {
-      s.deviceId = cred.deviceId;
-      rebound = true;
+  // Existing attempts retain their original device identity. Re-pairing is
+  // not authorization to transfer an attempt; the browser owns that policy.
+
+  for (const [attemptId, session] of Object.entries(sessions)) {
+    if (session?.deviceId && session.deviceId !== cred.deviceId) {
+      console.error(`[codelit-connect] command_reconciliation_required (${attemptId}): device changed — approve the transfer in the browser or start a new attempt. Saved identity and events were preserved.`);
     }
-  }
-  if (rebound) {
-    await saveSessions(sessions);
-    console.log("[codelit-connect] rebound local sessions to the current device.");
   }
 
-  // Crash recovery: any turn left in-flight was NOT auto-resent. Report it.
-  for (const [attemptId, s] of Object.entries(sessions)) {
-    if (s && s.inFlight) {
-      await client.queue(wrapEvent({ type: "turn.failed", payload: { error: "connector restarted mid-turn; the prompt was not auto-resent" }, turnId: s.inFlight }, { attemptId, deviceId: cred.deviceId, adapter: s.adapter, threadId: s.threadId }));
-      s.inFlight = null;
+  let adapters = [];
+  let lastDiscovery = 0;
+  const refreshAdapters = async () => {
+    if (Date.now() - lastDiscovery >= 30000) {
+      adapters = await Promise.all(Object.values(ADAPTERS).map((a) => a.capabilities()));
+      lastDiscovery = Date.now();
     }
-  }
+    return adapters;
+  };
+  await refreshAdapters();
+  const runtime = createAttemptRuntime({
+    adapters: ADAPTERS, sessions, deviceId: cred.deviceId,
+    queue: client.queue, uploadSnapshot: client.uploadSnapshot, saveSessions,
+    getCapabilities: async (name) => (await refreshAdapters()).find((a) => a.adapter === name),
+  });
+  await runtime.recover();
   await saveSessions(sessions);
   await client.flush();
 
-  const ctxFor = (attemptId) => {
-    const s = sessions[attemptId] || {};
-    return { attemptId, deviceId: cred.deviceId, adapter: s.adapter || "codex", threadId: s.threadId || null, turnId: s.inFlight || null };
-  };
-
-  for (const a of Object.values(ADAPTERS)) {
-    a.onEvent((ev) => {
-      // Route adapter events to their attempt via threadId.
-      for (const [attemptId, s] of Object.entries(sessions)) {
-        if (s && s.threadId === ev.nativeSessionId) {
-          if (ev.type === "turn.completed" || ev.type === "turn.failed" || ev.type === "turn.interrupted") s.inFlight = null;
-          void client.queue(wrapEvent(ev, ctxFor(attemptId)));
-          void saveSessions(sessions);
-        }
-      }
-    });
-  }
-
-  async function emitFileRevision(attemptId, dir, language, extra = {}) {
-    const r = await readSolution(dir, language);
-    await client.queue({ ...wrapEvent({ type: "file.revision", payload: { rev: r.rev, hash: r.hash, content: r.content.slice(0, 8000), ...extra } }, ctxFor(attemptId)) });
-  }
-
-  async function onCommand(cmd) {
-    const p = cmd.payload || {};
-    const attemptId = cmd.attemptId;
-    const dir = attemptDir(attemptId);
-
-    if (cmd.type === "session.start") {
-      const context = p.context || {};
-      const adapter = ADAPTERS[p.adapter] || codex;
-      await initAttempt(dir, context);
-      const { nativeSessionId } = await adapter.start({ cwd: dir, model: process.env.CODELIT_MODEL || null });
-      sessions[attemptId] = { deviceId: cred.deviceId, adapter: p.adapter || "codex", threadId: nativeSessionId, context, inFlight: null };
-      await saveSessions(sessions);
-      await emitFileRevision(attemptId, dir, context.language);
-      return;
-    }
-
-    const s = sessions[attemptId];
-    if (!s) throw new Error("no local session for attempt (restarted? ask for a new session)");
-    const adapter = ADAPTERS[s.adapter] || codex;
-    const context = s.context || {};
-
-    if (cmd.type === "turn.send") {
-      if (p.pendingEdit) {
-        const r = await applyBrowserEdit(dir, context.language, p.pendingEdit.code, p.pendingEdit.baseRev);
-        if (r.conflict) {
-          await client.queue(wrapEvent({ type: "file.revision", payload: { rev: r.rev, conflict: true } }, ctxFor(attemptId)));
-          await client.queue(wrapEvent({ type: "message.final", payload: { text: "Your editor was behind the agent's latest revision, so the flushed edit was not applied. The agent revision stands." } }, ctxFor(attemptId)));
-        } else {
-          await emitFileRevision(attemptId, dir, context.language);
-        }
-      }
-      s.inFlight = p.turnId || null;
-      await saveSessions(sessions);
-      await setInFlight(dir, s.inFlight).catch(() => {});
-      await adapter.turn(s.threadId, String(p.text || ""), { turnId: p.turnId });
-      return;
-    }
-    if (cmd.type === "turn.interrupt") {
-      await adapter.interrupt(s.threadId);
-      return;
-    }
-    if (cmd.type === "approval.decide") {
-      await adapter.decideApproval(s.threadId, String(p.approvalId || ""), String(p.decision || "deny"));
-      return;
-    }
-    if (cmd.type === "context.sync") {
-      const context2 = p.context || context;
-      s.context = { ...context, ...context2 };
-      await saveSessions(sessions);
-      await fs.writeFile(await safeJoin(dir, "TASK.md"), `# ${s.context.title} (stage ${s.context.stage})\n\n${s.context.brief}\n`);
-      return;
-    }
-    if (cmd.type === "test.run") {
-      const ctx = s.context || {};
-      const r = await runVisible(dir, ctx.language, ctx.visibleTests || [], ctx.fnName);
-      await client.queue(wrapEvent({ type: "local.command", payload: { cmd: "visible checks", passed: r.passed === r.total, summary: r.summary } }, ctxFor(attemptId)));
-      return;
-    }
-    if (cmd.type === "freeze.request") {
-      const deadline = Date.now() + 30000;
-      let st = adapter.state(s.threadId);
-      if (st === "running" || st === "waiting_approval") {
-        await adapter.interrupt(s.threadId).catch(() => {});
-        await new Promise((r) => setTimeout(r, 8000));
-        st = adapter.state(s.threadId);
-      }
-      while ((st === "running" || st === "waiting_approval") && Date.now() < deadline) {
-        await new Promise((r) => setTimeout(r, 2000));
-        st = adapter.state(s.threadId);
-      }
-      const wr = await recordAgentWrite(dir, (s.context || {}).language || "python");
-      const sol = await readSolution(dir, (s.context || {}).language || "python");
-      if (!sol.content.trim()) {
-        await client.queue(wrapEvent({ type: "message.final", payload: { text: "Nothing to submit — the solution file is empty." } }, ctxFor(attemptId)));
-        return;
-      }
-      if (wr.rev === 0) {
-        // The file never changed since the starter: the agent likely answered
-        // in chat without editing. Freeze anyway (honest evaluation), but say so.
-        await client.queue(wrapEvent({ type: "message.final", payload: { text: "Heads up: solution file unchanged since the starter — the agent never edited it. Freezing these bytes; they will likely fail acceptance." } }, ctxFor(attemptId)));
-      }
-      await emitFileRevision(attemptId, dir, (s.context || {}).language || "python");
-      const up = await client.uploadSnapshot(attemptId, {
-        path: `solution${(s.context || {}).language === "python" ? ".py" : (s.context || {}).language === "c++" ? ".cpp" : ".js"}`,
-        source: sol.content,
-        language: (s.context || {}).language || "python",
-        revision: wr.rev,
-      });
-      if (up.status !== 200) {
-        await client.queue(wrapEvent({ type: "message.final", payload: { text: `Snapshot upload failed (${up.status}); retry Finish.` } }, ctxFor(attemptId)));
-      }
-      return;
-    }
-    throw new Error(`unknown command ${cmd.type}`);
-  }
-
   console.log(`[codelit-connect] relaying to ${relay} as ${cred.deviceId}. Ctrl-C interrupts (active turns get one interrupt).`);
-  const stop = async () => {
-    console.log("\nstopping: interrupting active turns…");
-    for (const s of Object.values(sessions)) {
-      if (s && s.inFlight) {
-        try { await ADAPTERS[s.adapter || "codex"].interrupt(s.threadId); } catch {}
-      }
-    }
-    await new Promise((r) => setTimeout(r, 3000));
-    process.exit(0);
+  let stopping;
+  const stop = (reason = "signal", code = 0) => {
+    client.stop();
+    return stopping ||= (async () => {
+      console.log(`\nstopping: ${reason}`);
+      process.exitCode = code;
+      await runtime.shutdown(reason);
+      await client.flush();
+      process.exitCode = code;
+    })();
   };
-  process.on("SIGINT", () => void stop());
-  await client.runLoop(onCommand, async () => {
+  process.on("SIGINT", () => void stop("SIGINT"));
+  process.on("SIGTERM", () => void stop("SIGTERM"));
+  process.on("uncaughtException", (error) => { console.error(error); void stop("uncaughtException", 1); });
+  process.on("unhandledRejection", (error) => { console.error(error); void stop("unhandledRejection", 1); });
+  await client.runLoop(runtime.onCommand, async () => {
     console.error("[codelit-connect] device revoked or unknown. Re-pair to continue.");
-    process.exit(3);
-  });
+    await stop("device_revoked", 3);
+  }, refreshAdapters, { reconcile: runtime.reconcile, onShutdown: (reason) => stop(reason, 3), onLeaseLost: runtime.stopAttempt, onLeaseRenewed: runtime.renewAttempt });
+  if (stopping) await stopping;
 }
 
 const cmd = process.argv[2];

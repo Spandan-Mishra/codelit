@@ -1,6 +1,6 @@
 {
   "name": "codelit-connect",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local connector: runs your own coding agent (Codex, then Claude) for Codelit attempts. No dependencies, Node 22+.",
   "type": "module",
   "bin": {
@@ -9,5 +9,14 @@
   "engines": {
     "node": ">=22"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "test:live": "node --test test/live-codex.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md"
+  ]
 }

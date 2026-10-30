@@ -6,6 +6,7 @@
 import { newId } from "./secret";
 import { storeGet, storeSet } from "./store";
 import { type NativeEvent, type Provenance } from "./protocol";
+import { withNativeLock } from "./lock";
 
 interface AttemptLog {
   events: NativeEvent[];
@@ -33,14 +34,18 @@ async function saveLog(attemptId: string, log: AttemptLog): Promise<void> {
 export async function appendEvent(
   attemptId: string,
   base: Omit<NativeEvent, "seq" | "serverTime">,
-): Promise<{ event: NativeEvent; gap: boolean }> {
-  const log = await loadLog(attemptId);
-  const gap = base.source === "connector" && base.sourceSeq > log.lastSourceSeq + 1 && log.lastSourceSeq >= 0;
-  const event: NativeEvent = { ...base, seq: log.nextSeq++, serverTime: Date.now() };
-  log.events.push(event);
-  if (base.source === "connector" && base.sourceSeq > log.lastSourceSeq) log.lastSourceSeq = base.sourceSeq;
-  await saveLog(attemptId, log);
-  return { event, gap };
+): Promise<{ event: NativeEvent; gap: boolean; replay: boolean }> {
+  return withNativeLock(`events:${attemptId}`, async () => {
+    const log = await loadLog(attemptId);
+    const existing = log.events.find((event) => event.id === base.id);
+    if (existing) return { event: existing, gap: false, replay: true };
+    const gap = base.source === "connector" && base.sourceSeq > log.lastSourceSeq + 1 && log.lastSourceSeq >= 0;
+    const event: NativeEvent = { ...base, seq: log.nextSeq++, serverTime: Date.now() };
+    log.events.push(event);
+    if (base.source === "connector" && base.sourceSeq > log.lastSourceSeq) log.lastSourceSeq = base.sourceSeq;
+    await saveLog(attemptId, log);
+    return { event, gap, replay: false };
+  });
 }
 
 export async function recordServerEvent(
@@ -52,28 +57,30 @@ export async function recordServerEvent(
   payload: Record<string, unknown>,
   source: Provenance = "codelit",
 ): Promise<NativeEvent> {
-  const log = await loadLog(attemptId);
-  const event: NativeEvent = {
-    v: 1,
-    id: newId("ev"),
-    attemptId,
-    deviceId,
-    nativeSessionId,
-    turnId,
-    parentId: null,
-    type,
-    source,
-    seq: log.nextSeq++,
-    sourceSeq: -1,
-    sourceTime: Date.now(),
-    serverTime: Date.now(),
-    adapter: null,
-    model: null,
-    payload,
-  };
-  log.events.push(event);
-  await saveLog(attemptId, log);
-  return event;
+  return withNativeLock(`events:${attemptId}`, async () => {
+    const log = await loadLog(attemptId);
+    const event: NativeEvent = {
+      v: 1,
+      id: newId("ev"),
+      attemptId,
+      deviceId,
+      nativeSessionId,
+      turnId,
+      parentId: null,
+      type,
+      source,
+      seq: log.nextSeq++,
+      sourceSeq: -1,
+      sourceTime: Date.now(),
+      serverTime: Date.now(),
+      adapter: null,
+      model: null,
+      payload,
+    };
+    log.events.push(event);
+    await saveLog(attemptId, log);
+    return event;
+  });
 }
 
 export async function readEvents(attemptId: string, sinceSeq: number): Promise<NativeEvent[]> {

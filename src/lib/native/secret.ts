@@ -2,6 +2,8 @@
 // and HMAC-signed browser sessions. No credentials ever live here.
 
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 export function newId(prefix: string): string {
   return `${prefix}_${randomBytes(12).toString("hex")}`;
@@ -25,11 +27,18 @@ export function sha256(s: string): string {
 function serverSecret(): string {
   const s = process.env.NATIVE_SESSION_SECRET;
   if (s && s.length >= 16) return s;
-  // Dev fallback: random per process (sessions do not survive restarts).
-  if (!process.env.NATIVE_SESSION_SECRET) {
-    console.warn("[native] NATIVE_SESSION_SECRET unset — browser sessions are process-local.");
+  // Keep local demo identity across restarts too. This file is private and
+  // gitignored with the native store; production can set the env secret.
+  if (!globalThis.__nativeDevSecret) {
+    const dir = process.env.CODELIT_NATIVE_DATA_DIR || path.join(process.cwd(), "data", "native");
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const file = path.join(dir, "session-secret");
+    try { writeFileSync(file, randomBytes(32).toString("hex"), { flag: "wx", mode: 0o600 }); }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
+    const stored = readFileSync(file, "utf8").trim();
+    if (!/^[a-f0-9]{64}$/.test(stored)) throw new Error("Invalid native session-secret file.");
+    globalThis.__nativeDevSecret = stored;
   }
-  if (!globalThis.__nativeDevSecret) globalThis.__nativeDevSecret = randomBytes(32).toString("hex");
   return globalThis.__nativeDevSecret as string;
 }
 

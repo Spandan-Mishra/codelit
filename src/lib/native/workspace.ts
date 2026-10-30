@@ -9,6 +9,10 @@ import { createHash } from "node:crypto";
 export const SOLUTION_FILE = "solution";
 export const MAX_SNAPSHOT_CHARS = 60_000;
 
+export function solutionHash(source: string): string {
+  return createHash("sha256").update(source, "utf8").digest("hex");
+}
+
 export function snapshotHash(source: string, language: string): string {
   return createHash("sha256").update(`${language}\n${source}`, "utf8").digest("hex");
 }

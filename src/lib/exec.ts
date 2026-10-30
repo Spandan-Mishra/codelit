@@ -1,13 +1,8 @@
-// Shared local code runners. Used by /api/run and /api/agent-run.
-// and /api/agent-run (phase-1 scenario acceptance). Demo-grade isolation
-// (timeouts, temp dirs); harden before real users.
-
-import { execFile } from "node:child_process";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { outputsMatch } from "@/lib/runner";
-import type { TestCase } from "@/lib/types";
+// Candidate code runs exclusively in disposable OS namespaces; never in the web process.
+import { outputsMatch } from "./runner";
+import type { TestCase } from "./types";
+import { runSandbox, type SandboxResult } from "./execution/sandbox";
+export { ExecutionUnavailableError, isExecutionUnavailable } from "./execution/sandbox";
 
 export interface ExecResult {
   input: string;
@@ -17,66 +12,25 @@ export interface ExecResult {
   hidden?: boolean;
 }
 
-function toCamel(s: string) {
-  return s.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-}
-
-function serializeJs(v: unknown): string {
-  if (typeof v === "boolean") return v ? "True" : "False";
-  return JSON.stringify(v) ?? String(v);
-}
-
-function execTimeout(cmd: string, args: string[], opts: { timeout: number; cwd?: string }): Promise<{ stdout: string; stderr: string }> {
-  return new Promise((resolve, reject) => {
-    execFile(cmd, args, { timeout: opts.timeout, maxBuffer: 256 * 1024, cwd: opts.cwd }, (err, stdout, stderr) => {
-      if (err && !stdout) return reject(new Error((stderr || err.message).trim().split("\n").slice(-2).join(" ")));
-      resolve({ stdout: stdout ?? "", stderr: stderr ?? "" });
-    }).on("error", reject);
+function results(output: SandboxResult, fnName: string, tests: TestCase[]): ExecResult[] {
+  const lines = output.stdout.split("\n");
+  return tests.map((t, i) => {
+    const tag = `@@${i}@@`;
+    const line = [...lines].reverse().find(l => l.startsWith(tag));
+    const actual = output.failure ? `ERROR: ${output.failure}` : line?.slice(tag.length).trim() ?? "ERROR: no result returned";
+    return { input: t.input, expected: t.expected, actual, passed: !output.failure && outputsMatch(actual, t.expected, fnName), hidden: t.hidden };
   });
 }
 
-// Python: candidate code lives in its own module file, the driver imports it.
-// Appended test lines can never be swallowed by unfinished brackets/strings
-// in the candidate, which was the IndentationError source.
-// The trusted channel is marker lines (@@i@@ + repr of the RETURN value).
-// Candidate prints — import-time noise, debug lines — are swallowed by
-// redirect_stdout (discarded) and can no longer shift answers across tests.
-// Last marker wins, so stray prints never shadow the real result. Residual:
-// a deliberately hostile module can still escape redirect_stdout (raw fd
-// writes, atexit); closing that needs an isolated harness (P0-1 track).
 export async function runPython(code: string, fnName: string, tests: TestCase[]): Promise<ExecResult[]> {
   const normalized = code.replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").replace(/\s+$/, "") + "\n";
-  const dir = await mkdtemp(join(tmpdir(), "codelit-py-"));
-  try {
-    await writeFile(join(dir, "solution.py"), normalized);
-    const calls = tests
-      .map(
-        (t, i) =>
-          `try:\n    _buf=io.StringIO()\n    with contextlib.redirect_stdout(_buf):\n        _r=solution.${t.input}\n    print("@@${i}@@" + repr(_r), flush=True)\nexcept Exception as e:\n    print("@@${i}@@ERROR: " + str(e), flush=True)`
-      )
-      .join("\n");
-    const { stdout } = await execTimeout("python3", ["-c", `import solution, io, contextlib\n${calls}`], {
-      timeout: 8000,
-      cwd: dir,
-    });
-    const lines = stdout.split("\n");
-    return tests.map((t, i) => {
-      const tag = `@@${i}@@`;
-      const line = [...lines].reverse().find((l) => l.startsWith(tag)) ?? "";
-      const actual = line.slice(tag.length).trim();
-      return { input: t.input, expected: t.expected, actual, passed: outputsMatch(actual, t.expected, fnName), hidden: t.hidden };
-    });
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  const calls = tests.map((t, i) =>
+    `try:\n    with contextlib.redirect_stdout(io.StringIO()):\n        _r=solution.${t.input}\n    print("@@${i}@@" + repr(_r), flush=True)\nexcept Exception as e:\n    print("@@${i}@@ERROR: " + str(e), flush=True)`
+  ).join("\n");
+  const driver = `import sys, io, contextlib\nsys.path.insert(0, "/submission")\nwith contextlib.redirect_stdout(io.StringIO()):\n    import solution\n${calls}\n`;
+  return results(await runSandbox("python", { "solution.py": normalized, "driver.py": driver }), fnName, tests);
 }
 
-// Python-style test expr -> C++ expr for our problem set:
-// [2,7] -> {2,7}, 's' -> "s", True -> true. String contents in our tests
-// hold no brackets, so a flat replace is enough for now.
-// Contract for generated suites: string literals must be double-quoted and
-// contain no '[' ']' brackets (or apostrophes), so this flat replace never
-// mangles string contents.
 function pyExprToCpp(expr: string): string {
   return expr.replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false").replace(/'/g, '"').replace(/\[/g, "{").replace(/\]/g, "}");
 }
@@ -90,49 +44,21 @@ string pstr(const string& s){ostringstream o;o<<quoted(s);return o.str();}
 `;
 
 export async function runCpp(code: string, fnName: string, tests: TestCase[], ret: string): Promise<ExecResult[]> {
-  const printer =
-    ret === "vecvec" ? "pvecvec" : ret === "int" ? "to_string" : ret === "groups" ? "pgroups" : ret === "str" ? "pstr" : "pvec";
-  const dir = await mkdtemp(join(tmpdir(), "codelit-cpp-"));
-  try {
-    // Marker-prefixed answer lines (@@i@@value); innocent debug prints land
-    // on other lines and no longer shift answers across tests. Last marker
-    // wins. Residual: a hostile binary can print fake markers — closing that
-    // needs an isolated harness (P0-1 track).
-    const calls = tests
-      .map((t, i) => {
-        const expr = pyExprToCpp(t.input);
-        const call = ret === "bool" ? `(${expr} ? string("True") : string("False"))` : `${printer}(${expr})`;
-        // Value first into a temp, THEN the tag+value on one atomic line: a
-        // noisy callee's prints land on earlier lines, never inside ours.
-        return `try{string _a${i}=${call};cout<<"@@${i}@@"<<_a${i}<<endl;}catch(...){cout<<"@@${i}@@ERROR: exception"<<endl;}`;
-      })
-      .join("\n");
-    await writeFile(join(dir, "solution.cpp"), `${CPP_PRELUDE}${code}\nint main(){${calls}return 0;}\n`);
-    await execTimeout("g++", ["-std=c++17", "-O2", "-o", "sol", "solution.cpp"], { timeout: 20000, cwd: dir });
-    const { stdout } = await execTimeout("./sol", [], { timeout: 5000, cwd: dir });
-    const lines = stdout.split("\n");
-    return tests.map((t, i) => {
-      const tag = `@@${i}@@`;
-      const line = [...lines].reverse().find((l) => l.startsWith(tag)) ?? "";
-      const actual = line.slice(tag.length).trim();
-      return { input: t.input, expected: t.expected, actual, passed: outputsMatch(actual, t.expected, fnName), hidden: t.hidden };
-    });
-  } finally {
-    await rm(dir, { recursive: true, force: true });
-  }
+  const printer = ret === "vecvec" ? "pvecvec" : ret === "int" ? "to_string" : ret === "groups" ? "pgroups" : ret === "str" ? "pstr" : "pvec";
+  const calls = tests.map((t, i) => {
+    const expr = pyExprToCpp(t.input);
+    const call = ret === "bool" ? `(${expr} ? string("True") : string("False"))` : `${printer}(${expr})`;
+    return `try{string _a${i}=${call};cout<<"@@${i}@@"<<_a${i}<<endl;}catch(...){cout<<"@@${i}@@ERROR: exception"<<endl;}`;
+  }).join("\n");
+  return results(await runSandbox("cpp", { "solution.cpp": `${CPP_PRELUDE}${code}\nint main(){${calls}return 0;}\n` }), fnName, tests);
 }
 
-export function runJs(code: string, fnName: string, tests: TestCase[]): ExecResult[] {
-  const jsFn = toCamel(fnName);
-  return tests.map((t) => {
+export async function runJs(code: string, fnName: string, tests: TestCase[]): Promise<ExecResult[]> {
+  const jsFn = fnName.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+  const calls = tests.map((t, i) => {
     const expr = t.input.replaceAll(fnName, jsFn).replace(/\bTrue\b/g, "true").replace(/\bFalse\b/g, "false");
-    try {
-      // Demo sandbox: runs candidate JS in this route process. Isolate before real users.
-      const fn = new Function(`${code}\nreturn (${expr});`) as () => unknown;
-      const actual = serializeJs(fn());
-      return { input: t.input, expected: t.expected, actual, passed: outputsMatch(actual, t.expected, fnName), hidden: t.hidden };
-    } catch (e) {
-      return { input: t.input, expected: t.expected, actual: `ERROR: ${e instanceof Error ? e.message : String(e)}`, passed: false, hidden: t.hidden };
-    }
-  });
+    // Preserve the old per-test function scope and return-value serialization.
+    return `try { const value = (() => { ${code}\nreturn (${expr}); })(); const actual = typeof value === "boolean" ? (value ? "True" : "False") : JSON.stringify(value) ?? String(value); console.log("@@${i}@@" + actual); } catch(e) { console.log("@@${i}@@ERROR: " + e.message); }`;
+  }).join("\n");
+  return results(await runSandbox("js", { "driver.cjs": calls }), fnName, tests);
 }

@@ -1,26 +1,24 @@
-// Your agents: pair a local coding agent and solve through Codelit.
-// No API keys live here — the connector on your computer holds your agent
-// login; Codelit keeps only a revocable device token.
-
-"use client";
 import Link from "next/link";
+import { Suspense } from "react";
 import NativeConnect from "@/components/NativeConnect";
-import NativeSetupGuide from "@/components/NativeSetupGuide";
 
-export default function AgentsPage() {
+type Query = Promise<{ next?: string | string[] }>;
+
+async function AgentConnection({ searchParams }: { searchParams: Query }) {
+  const { next } = await searchParams;
+  // Keep return navigation on the known solving routes, including the selected
+  // scenario, and reject protocol-relative and other external destinations.
+  const continueHref = typeof next === "string" && /^\/native(?:\?|\/|$)/.test(next) && !/[\\\r\n]/.test(next) ? next : "/native";
+  return <><div className="mt-6"><NativeConnect continueHref={continueHref} /></div><p className="mt-5 font-ui text-sm"><Link href={continueHref} className="text-[#e8b33d] hover:underline">Back to workspace →</Link></p></>;
+}
+
+export default function AgentsPage({ searchParams }: { searchParams: Query }) {
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:py-10">
-      <h1 className="text-3xl tracking-tight">Your agents</h1>
-      <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">
-        Bring your own coding agent — Codex today, Claude next. It runs on your computer with
-        your login; Codelit sees only the challenge conversation.{" "}
-        <Link href="/native" className="text-[#e8b33d] hover:underline rounded">Solve with my agent →</Link>
-      </p>
-
-      <div className="mt-6">
-        <NativeConnect />
-      </div>
-      <NativeSetupGuide />
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
+      <p className="font-ui text-xs uppercase tracking-[0.15em] text-[#e8b33d]">Bring your own agent</p>
+      <h1 className="mt-2 text-3xl tracking-tight">Connect once. Solve here.</h1>
+      <p className="mt-3 max-w-2xl font-ui text-sm leading-6 text-[#b3afa3]">Use your installed coding agent and local provider login. A small connector brings its conversation, tools, and solution changes into your Codelit workspace.</p>
+      <Suspense fallback={<p className="mt-6 font-ui text-sm text-[#b3afa3]">Loading connection…</p>}><AgentConnection searchParams={searchParams} /></Suspense>
     </div>
   );
 }

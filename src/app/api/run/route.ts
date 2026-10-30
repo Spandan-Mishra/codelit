@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { friendlyRunError } from "@/lib/errors";
 import { getProblem } from "@/lib/problems";
 import { limited, clientIp } from "@/lib/ratelimit";
-import { runPython, runJs, runCpp } from "@/lib/exec";
+import { runPython, runJs, runCpp, isExecutionUnavailable } from "@/lib/exec";
 import type { TestCase } from "@/lib/types";
 
 export async function POST(req: Request) {
@@ -24,7 +24,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ results: [], error: "Payload too large (max 20k code chars, 10 tests).", engine: "none" }, { status: 413 });
   }
   try {
-    if (language === "javascript") return NextResponse.json({ results: runJs(code, fnName, tests), engine: "local-js" });
+    if (language === "javascript") {
+      const results = await runJs(code, fnName, tests);
+      return NextResponse.json({ results, engine: "local-js" });
+    }
     if (language === "c++") {
       const ret = cppReturn || (problemId && getProblem(problemId)?.cppReturn) || "vec";
       return NextResponse.json({ results: await runCpp(code, fnName, tests, ret), engine: "local-cpp" });
@@ -32,10 +35,13 @@ export async function POST(req: Request) {
     const results = await runPython(code, fnName, tests);
     return NextResponse.json({ results, engine: "local-python" });
   } catch (e) {
+    // Infrastructure failure banks no verdict: the caller may retry (F12).
+    const unavailable = isExecutionUnavailable(e);
     return NextResponse.json({
       results: tests.map((t) => ({ input: t.input, expected: t.expected, actual: "", passed: false, hidden: t.hidden })),
       error: friendlyRunError(e instanceof Error ? e.message : String(e)),
+      retryable: unavailable,
       engine: "local-error",
-    });
+    }, { status: unavailable ? 503 : 500 });
   }
 }

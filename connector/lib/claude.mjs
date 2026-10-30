@@ -32,10 +32,15 @@ export async function capabilities() {
     workspaceRestrictions: false,
     approvalKinds: [],
     validated: false,
+    installed: d.found,
+    ready: false,
+    status: d.found ? "unsupported" : "missing",
+    message: d.found ? UNREADY : d.hint,
+    models: [],
   };
 }
 
-const UNREADY = "Claude support is not validated yet (Phase 2): the Agent SDK embedding, subscription eligibility, and permission callbacks must be exercised first. Use Codex for now.";
+const UNREADY = "Claude Code is installed, but this connector has no supported Claude execution adapter. CLI installation does not enable solving. Select a ready Codex adapter.";
 
 export async function probe() {
   const d = await detect();

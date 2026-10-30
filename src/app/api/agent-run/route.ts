@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { friendlyRunError } from "@/lib/errors";
 import { limited, clientIp } from "@/lib/ratelimit";
-import { runPython, runJs, runCpp } from "@/lib/exec";
+import { runPython, runJs, runCpp, isExecutionUnavailable } from "@/lib/exec";
 import { getScenario, instantiateTests, visibleTests, STAGE_COUNT } from "@/lib/scenarios";
 import { validateEvent, efficiencyScore, summarizeTrace, parseStageNumber, MAX_EVENT_TEXT } from "@/lib/trace";
 import type { AgentAttempt, Scenario, ScenarioStage, TraceEvent, TraceEventKind } from "@/lib/types";
@@ -179,7 +179,7 @@ export async function POST(req: Request) {
       const lang = language as Language;
       const results =
         lang === "javascript"
-          ? runJs(code, scenario.fnName, tests)
+          ? await runJs(code, scenario.fnName, tests)
           : lang === "c++"
             ? await runCpp(code, scenario.fnName, tests, scenario.cppReturn ?? "vec")
             : await runPython(code, scenario.fnName, tests);
@@ -200,13 +200,15 @@ export async function POST(req: Request) {
         engine: lang === "javascript" ? "local-js" : lang === "c++" ? "local-cpp" : "local-python",
       });
     } catch (e) {
-      // Infra failure: do NOT consume the one shot.
+      // Infra failure: do NOT consume the one shot (F12).
+      const unavailable = isExecutionUnavailable(e);
       return NextResponse.json(
         {
           error: friendlyRunError(e instanceof Error ? e.message : String(e)),
+          retryable: unavailable,
           engine: "local-error",
         },
-        { status: 500 }
+        { status: unavailable ? 503 : 500 }
       );
     }
   }

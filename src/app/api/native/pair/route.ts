@@ -15,7 +15,7 @@ import {
   registerDevice,
   ticketStatus,
 } from "@/lib/native/registry";
-import type { AdapterCapabilities } from "@/lib/native/protocol";
+import { cleanAdapters } from "@/lib/native/devices";
 
 function withSessionCookie(res: NextResponse, signed: string): NextResponse {
   res.headers.append(
@@ -23,27 +23,6 @@ function withSessionCookie(res: NextResponse, signed: string): NextResponse {
     `${NATIVE_SESSION_COOKIE}=${encodeURIComponent(signed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`
   );
   return res;
-}
-
-function cleanAdapters(v: unknown): AdapterCapabilities[] {
-  if (!Array.isArray(v)) return [];
-  return v.slice(0, 4).map((a) => {
-    const o = (typeof a === "object" && a !== null ? a : {}) as Record<string, unknown>;
-    const b = (k: string) => o[k] === true;
-    return {
-      adapter: o.adapter === "claude" ? "claude" : "codex",
-      adapterVersion: String(o.adapterVersion || "").slice(0, 40),
-      textDeltas: b("textDeltas"),
-      toolArgs: b("toolArgs"),
-      toolResults: b("toolResults"),
-      fileDiffs: b("fileDiffs"),
-      nativeResume: b("nativeResume"),
-      usageReporting: b("usageReporting"),
-      workspaceRestrictions: b("workspaceRestrictions"),
-      approvalKinds: Array.isArray(o.approvalKinds) ? (o.approvalKinds as unknown[]).map(String).slice(0, 8) : [],
-      validated: false, // the relay never trusts a self-reported validated flag
-    } satisfies AdapterCapabilities;
-  });
 }
 
 export async function POST(req: Request) {
