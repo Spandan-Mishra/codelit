@@ -86,6 +86,7 @@ const canon = generateMinRooms(0);
 export const minRoomsScenario: Scenario = {
   id: "vault-min-rooms",
   title: "Meeting Rooms",
+  blurb: "Book the fewest rooms that fit every meeting. Sort starts and ends, then sweep: meetings [9, 10] and [10, 11] touch but never overlap, so 1 room is enough — an ending meeting frees its room first.",
   difficulty: "Medium",
   tags: ["Sorting", "Intervals"],
   minutes: 25,

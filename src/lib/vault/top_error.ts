@@ -72,6 +72,7 @@ const canon = generateTopError(0);
 export const topErrorScenario: Scenario = {
   id: "vault-top-error",
   title: "Top Error",
+  blurb: "Read a failing service log and name the most frequent error code. For [500, 404, 500] the answer is 500 (seen twice); ties break to the smallest code string, so [404, 500] returns 404.",
   difficulty: "Medium",
   tags: ["Hash Map", "Strings"],
   minutes: 25,

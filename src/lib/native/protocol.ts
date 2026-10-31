@@ -133,10 +133,13 @@ export interface AttemptSnapshot {
 
 export type AttemptStatus = "open" | "running" | "waiting_approval" | "finishing" | "done";
 
+export type AttemptMode = "practice" | "ranked";
+
 export interface NativeAttempt {
   id: string; // stable owned attempt id (never an IP)
   sessionId: string; // owning browser session (signed, opaque)
   scenarioId: string;
+  mode: AttemptMode; // practice: learn, repeatable, unscored. ranked: gated, defended, banked.
   seed: number;
   stage: number;
   language: string;

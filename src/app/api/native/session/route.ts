@@ -11,6 +11,7 @@ import {
   createAttempt,
   enqueueCommand,
   getDevice,
+  listAttempts,
   ownAttempt,
   pendingFreeze,
   readBrowserSession,
@@ -33,6 +34,17 @@ import type { DeviceRecord } from "@/lib/native/protocol";
 type Language = "python" | "javascript" | "c++";
 const LANGUAGES: Language[] = ["python", "javascript", "c++"];
 const MAX_PROMPT = 6000;
+// Ranked unlocks after this many DISTINCT practice scenarios are passed.
+// Attempts stored before modes existed count as practice.
+export const RANKED_UNLOCK_PRACTICE_SOLVES = 5;
+
+export async function practiceSolves(sessionId: string): Promise<number> {
+  const solved = new Set<string>();
+  for (const a of await listAttempts(sessionId)) {
+    if (a.acceptance?.passed === true && (a.mode || "practice") !== "ranked") solved.add(a.scenarioId);
+  }
+  return solved.size;
+}
 
 function providerError(device: DeviceRecord, adapter: string, model: unknown): string | null {
   if (!isDeviceOnline(device)) return "Your connector is offline. Open Providers and run the connector to reconnect.";
@@ -91,8 +103,15 @@ export async function POST(req: Request) {
           return NextResponse.json({ error: "Transfer source must be another device you paired in this browser." }, { status: 403 });
         }
       }
+      const mode = String(body.mode || "practice") === "ranked" ? "ranked" : "practice";
+      if (mode === "ranked") {
+        const solved = await practiceSolves(sessionId);
+        if (solved < RANKED_UNLOCK_PRACTICE_SOLVES) {
+          return NextResponse.json({ error: `Ranked unlocks after passing ${RANKED_UNLOCK_PRACTICE_SOLVES} practice scenarios — you have ${solved}. Practice is repeatable and unscored.` }, { status: 403 });
+        }
+      }
       const seed = Math.floor(Math.random() * 2 ** 31);
-      const attempt = await createAttempt(sessionId, scenario.id, seed, language);
+      const attempt = await createAttempt(sessionId, scenario.id, seed, language, mode);
       attempt.deviceId = device.deviceId;
       attempt.adapter = adapter as NativeAttempt["adapter"];
       attempt.model = typeof body.model === "string" && body.model ? body.model : null;

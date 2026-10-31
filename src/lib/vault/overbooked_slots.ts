@@ -96,6 +96,7 @@ const canon = generateOverbookedSlots(0);
 export const overbookedSlotsScenario: Scenario = {
   id: "vault-overbooked-slots",
   title: "Overbooked Slots",
+  blurb: "Audit a room calendar with a capacity limit and flag every meeting past capacity, in sweep order. With capacity 1 and meetings [9, 11], [10, 12]: the second starts while the first still runs, so index 1 is flagged.",
   difficulty: "Hard",
   tags: ["Sweep Line", "Intervals"],
   minutes: 30,

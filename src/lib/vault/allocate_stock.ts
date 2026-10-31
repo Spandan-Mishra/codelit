@@ -79,6 +79,7 @@ const canon = generateAllocateStock(0);
 export const allocateStockScenario: Scenario = {
   id: "vault-allocate-stock",
   title: "Allocate Stock",
+  blurb: "Play warehouse keeper: walk each order in turn, fulfill it if stock remains, and never let a skipped order block a later one. With stock 6 and orders [4, 2, 5]: 4 fits (2 left), 2 fits (0 left), 5 does not — [1, 1, 0].",
   difficulty: "Medium",
   tags: ["Greedy", "Arrays"],
   minutes: 25,

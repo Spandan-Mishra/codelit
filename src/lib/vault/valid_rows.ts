@@ -75,6 +75,7 @@ const canon = generateValidRows(0);
 export const validRowsScenario: Scenario = {
   id: "vault-valid-rows",
   title: "Valid Rows",
+  blurb: "Scrub a signup sheet, keeping rows with age 18-99 and ZIP 10000-99999, bounds inclusive. For ages [25, 17, 30] and ZIPs [12345, 90210, 999]: row 0 is valid, row 1's age fails, row 2's ZIP fails — [0].",
   difficulty: "Medium",
   tags: ["Filtering", "Arrays"],
   minutes: 25,

@@ -47,6 +47,7 @@ const canon = generateRetryDelays(0);
 export const retryDelaysScenario: Scenario = {
   id: "vault-retry-delays",
   title: "Retry Backoff",
+  blurb: "Schedule waits between retries that grow exponentially but never pass a cap. With base 1, factor 2, cap 5 over 4 failures: waits are 1, 2, 4, then 8 capped to 5 — [1, 2, 4, 5].",
   difficulty: "Medium",
   tags: ["Math", "Simulation"],
   minutes: 25,

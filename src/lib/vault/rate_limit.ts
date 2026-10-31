@@ -75,6 +75,7 @@ const canon = generateRateLimit(0);
 export const rateLimitScenario: Scenario = {
   id: "vault-rate-limit",
   title: "Rate Limit",
+  blurb: "Guard an API: each request is allowed only while fewer than capacity already-allowed requests sit inside the window. With capacity 2 and window 5, requests at [0, 1, 2, 3] give [1, 1, 0, 0] — denied requests never consume quota.",
   difficulty: "Medium",
   tags: ["Sliding Window", "Arrays"],
   minutes: 25,

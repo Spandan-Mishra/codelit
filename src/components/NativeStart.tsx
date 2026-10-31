@@ -13,6 +13,7 @@ type Scenario = { id: string; title: string };
 type Language = "python" | "javascript" | "c++";
 type ScenarioPreview = {
   id: string;
+  blurb: string;
   difficulty: string;
   minutes: number;
   promptPar: number;
@@ -27,6 +28,7 @@ interface Attempt {
   shortId?: string;
   title?: string;
   scenarioId: string;
+  mode?: string;
   scenarioTitle?: string;
   status: string;
   createdAt: number;
@@ -65,7 +67,8 @@ function loadDeletedAttemptIds(): Set<string> {
 const inputClass = "mt-1.5 w-full rounded-md border border-[#3a3c37] bg-black/30 px-3 py-2.5 text-sm outline-none disabled:opacity-50";
 const statusLabels: Record<string, string> = { open: "Ready to continue", running: "Agent working", waiting_approval: "Needs approval", finishing: "Grading", done: "Completed" };
 
-export default function NativeStart({ scenarios, initialScenarioId, preview }: { scenarios: Scenario[]; initialScenarioId?: string; preview?: ScenarioPreview }) {
+export default function NativeStart({ scenarios, initialScenarioId, initialMode, preview }: { scenarios: Scenario[]; initialScenarioId?: string; initialMode?: "practice" | "ranked"; preview?: ScenarioPreview }) {
+  const mode = initialMode === "ranked" ? "ranked" : "practice";
   const router = useRouter();
   const [changingScenario, changeScenario] = useTransition();
   const [openingAttempt, openAttempt] = useTransition();
@@ -125,7 +128,9 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
   const provider = availableAdapters.find((item) => item.adapter === adapter) || availableAdapters[0];
   const models = provider?.models || [];
   const selectedModel = models.some((item) => item.id === model) ? model : "";
-  const returnHref = scenarioId ? `/native?scenario=${encodeURIComponent(scenarioId)}` : "/native";
+  const returnHref = scenarioId ? `/native?scenario=${encodeURIComponent(scenarioId)}&mode=${mode}` : "/native";
+  const practiceSolved = new Set(attempts.filter((a) => a.acceptance?.passed === true && (a.mode || "practice") !== "ranked").map((a) => a.scenarioId)).size;
+  const rankedGate = mode === "ranked" && practiceSolved < 5;
   const connectHref = `/agents?next=${encodeURIComponent(returnHref)}`;
   const unavailableDevices = liveDevices.filter((item) => !readyDevices.some((readyDevice) => readyDevice.deviceId === item.deviceId));
   const liveAttempts = attempts.filter((attempt) => !deletedIds.has(attempt.id));
@@ -156,7 +161,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
   }
 
   const sample = preview?.id === scenarioId ? preview : undefined;
-  const resumable = liveAttempts.filter((attempt) => attempt.scenarioId === scenarioId && !attempt.archivedAt && attempt.status !== "done");
+  const resumable = liveAttempts.filter((attempt) => attempt.scenarioId === scenarioId && (attempt.mode || "practice") === mode && !attempt.archivedAt && attempt.status !== "done");
   const preparing = busy || openingAttempt;
   const locked = preparing || !!createdAttemptId;
 
@@ -184,7 +189,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
     try {
       const res = await fetch("/api/native/session", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "start", scenarioId, language, deviceId: device.deviceId, adapter: provider.adapter, model: selectedModel || null }),
+        body: JSON.stringify({ op: "start", scenarioId, language, deviceId: device.deviceId, adapter: provider.adapter, model: selectedModel || null, mode }),
       });
       const data = await res.json();
       if (!res.ok || typeof data.attempt?.id !== "string") throw new Error(data.error || "Could not start this attempt.");
@@ -241,7 +246,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
             return <li key={attempt.id} className="rounded-xl border border-[#30322c] bg-[#141613] p-4">
               {editingId === attempt.id ? <form onSubmit={(event) => { event.preventDefault(); void updateAttempt(attempt.id, "rename"); }} className="flex items-center gap-2"><input autoFocus aria-label="Attempt title" value={draftTitle} maxLength={80} onChange={(event) => setDraftTitle(event.target.value)} className="min-w-0 flex-1 rounded-md border border-[#3a3c37] bg-black/30 px-2 py-1.5 text-sm" /><button type="submit" disabled={!!mutatingId || !draftTitle.trim()} aria-label="Save attempt title" className="rounded p-1 text-emerald-300 disabled:opacity-50"><Check className="h-4 w-4" /></button><button type="button" aria-label="Cancel rename" onClick={() => setEditingId("")} className="rounded p-1 text-[#b3afa3]"><X className="h-4 w-4" /></button></form> : <Link href={`/native/${encodeURIComponent(attempt.id)}`} className="block break-words text-sm font-semibold leading-6 text-[#ece9e2] hover:text-[#e8b33d]">{title}</Link>}
               {title !== scenarioName && <p className="mt-1 text-xs text-[#9a968c]">Scenario: {scenarioName}</p>}
-              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#9a968c]"><span title={attempt.id} className="font-code text-[#e8b33d]">#{attempt.shortId || attempt.id.slice(-8)}</span><span>· {statusLabels[attempt.status] || attempt.status}</span><time dateTime={new Date(attempt.createdAt).toISOString()} className="ml-auto">{new Date(attempt.createdAt).toLocaleDateString()}</time></div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[#9a968c]"><span title={attempt.id} className="font-code text-[#e8b33d]">#{attempt.shortId || attempt.id.slice(-8)}</span><span>· {(attempt.mode || "practice") === "ranked" ? "Ranked" : "Practice"}</span><span>· {statusLabels[attempt.status] || attempt.status}</span><time dateTime={new Date(attempt.createdAt).toISOString()} className="ml-auto">{new Date(attempt.createdAt).toLocaleDateString()}</time></div>
               <div className="mt-3 flex justify-between gap-2 text-xs text-[#b3afa3]"><span>Stage {stage}/{totalStages}</span><span>{progress ? `${progress.turnsUsed}/${progress.promptLimit} prompts${progress.turnsReserved ? ` · ${progress.turnsReserved} queued` : ""}` : `${attempt.turnsUsed ?? 0} prompts`}</span></div>
               <div role="progressbar" aria-label="Released challenge stages" aria-valuemin={0} aria-valuemax={totalStages} aria-valuenow={stage} className="mt-2 h-1 overflow-hidden rounded-full bg-[#30322c]"><div style={{ width: `${Math.min(100, stage / totalStages * 100)}%` }} className="h-full bg-[#e8b33d]/70" /></div>
               {attempt.latestCheck && <p className="mt-2 text-xs text-[#9a968c]">Last check · {attempt.latestCheck.passed}/{attempt.latestCheck.total} passed · stage {attempt.latestCheck.stage}</p>}
@@ -272,6 +277,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
         <div>
           <div className="flex items-center gap-2 font-ui text-xs text-[#9a968c]"><Link href="/scenarios" className="hover:text-[#e8b33d]">Scenarios</Link><span>/</span><span>{scenario ? "Solving workspace" : "Agent workspace"}</span></div>
           <h1 className="mt-2 text-2xl tracking-tight sm:text-3xl">{scenario?.title || "Your attempts"}</h1>
+          {scenario && <p className="mt-2 font-ui text-xs"><span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-semibold ${mode === "ranked" ? "border-[#e8b33d]/50 text-[#e8b33d]" : "border-[#3a3c37] text-[#b3afa3]"}`}>{mode === "ranked" ? "Ranked — defended and scored" : "Practice — repeatable, unscored"}</span></p>}
         </div>
         <div className="flex items-center gap-4 font-ui text-xs">
           {scenario && <Link href="/native" className="text-[#b3afa3] hover:text-white">All attempts</Link>}
@@ -284,6 +290,8 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
           <p className="font-semibold text-[#efcf88]">Read first — you never hand-write code here.</p>
           <p className="mt-1">Your agent writes <span className="font-code">solution.*</span> on its own computer. The workspace file panel is a read-only, revisioned view: every agent turn flushes the newest revision there. You direct, review, and test — the agent types.</p>
         </section>
+        {rankedGate && <p role="status" className="mt-4 rounded-xl border border-[#e8b33d]/35 bg-[#e8b33d]/[0.04] p-4 font-ui text-xs leading-6 text-[#d5c59e]">Ranked unlocks after passing 5 practice scenarios — you have {practiceSolved}. Practice attempts are repeatable and unscored; the server enforces this gate when you start.</p>}
+        {!rankedGate && mode === "ranked" && <p role="status" className="mt-4 rounded-xl border border-emerald-400/25 bg-emerald-400/5 p-4 font-ui text-xs leading-6 text-emerald-200">Ranked run. Finish, defend your solution under time, and bank the score on your passport.</p>}
         {historyLoading && <p role="status" className="mt-4 font-ui text-xs text-[#b3afa3]">Checking for attempts to resume…</p>}
         {resumable.length > 0 && <section aria-label="Resume this scenario" className="mt-5 rounded-xl border border-[#e8b33d]/35 bg-[#e8b33d]/[0.04] p-4 font-ui">
           <h2 className="text-sm font-semibold text-[#efcf88]">Continue where you left off</h2>
@@ -299,6 +307,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#30322c] px-5 py-3 text-xs"><span className="font-semibold text-[#e8b33d]">Stage 1 of 3 · {sample.stageTitle}</span><span className="text-[#9a968c]">{sample.difficulty} · {sample.minutes} min · {sample.promptPar} prompts</span></div>
             <div className="p-5 sm:p-6">
               <p className="mb-4 rounded-md border border-[#3a3c37] bg-black/20 px-3 py-2 text-xs leading-5 text-[#b3afa3]"><span className="font-semibold text-[#efcf88]">Sample preview.</span> Each attempt gets its own brief and example values. Your exact requirements appear when you start an attempt.</p>
+              <p className="mb-4 text-xs leading-6 text-[#b3afa3]">{sample.blurb}</p>
               <h2 className="mb-3 text-base font-semibold">{sample.stageTitle}</h2>
               <SessionMarkdown text={sample.brief} />
               {sample.visibleTests.length > 0 && <div className="mt-5"><h3 className="text-xs font-semibold text-[#b3afa3]">Sample example{sample.visibleTests.length === 1 ? "" : "s"}</h3><div className="mt-2 space-y-2">{sample.visibleTests.map((test, index) => <dl key={index} className="rounded-md border border-[#30322c] bg-black/20 p-3 text-xs"><dt className="text-[#9a968c]">Input</dt><dd className="mt-1 overflow-x-auto whitespace-pre font-code leading-6 text-[#e0ded5]">{test.input}</dd><dt className="mt-2 text-[#9a968c]">Expected output</dt><dd className="mt-1 overflow-x-auto whitespace-pre font-code leading-6 text-[#e0ded5]">{test.expected}</dd></dl>)}</div></div>}

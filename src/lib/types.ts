@@ -71,6 +71,9 @@ export interface ScenarioStubs {
 export interface Scenario {
   id: string;
   title: string;
+  // Plain-language summary with one tiny worked sample. Seed-independent:
+  // shown on list cards and previews, never inside attempts.
+  blurb: string;
   difficulty: Difficulty;
   tags: string[];
   minutes: number;

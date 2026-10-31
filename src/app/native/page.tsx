@@ -3,18 +3,20 @@ import NativeStart from "@/components/NativeStart";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { stageContext, starterFor } from "@/lib/native/context";
 
-type Query = Promise<{ scenario?: string | string[] }>;
+type Query = Promise<{ scenario?: string | string[]; mode?: string | string[] }>;
 
 async function Launcher({ searchParams }: { searchParams: Query }) {
-  const { scenario } = await searchParams;
+  const { scenario, mode } = await searchParams;
   const scenarios = ALL_SCENARIOS.map((item) => ({ id: item.id, title: item.title }));
   const initialScenarioId = typeof scenario === "string" && scenarios.some((item) => item.id === scenario) ? scenario : undefined;
+  const initialMode = mode === "ranked" ? "ranked" : "practice";
   const selected = ALL_SCENARIOS.find((item) => item.id === initialScenarioId);
   // Only public stage-one context crosses this boundary. Each real attempt
   // still receives its own seed from session.start; this is a labelled sample.
   const sample = selected ? stageContext(selected, 0, 1, "python") : undefined;
   const preview = selected && sample ? {
     id: selected.id,
+    blurb: selected.blurb,
     difficulty: selected.difficulty,
     minutes: selected.minutes,
     promptPar: selected.promptPar,
@@ -27,7 +29,7 @@ async function Launcher({ searchParams }: { searchParams: Query }) {
       "c++": starterFor(selected, "c++"),
     },
   } : undefined;
-  return <NativeStart key={initialScenarioId || "launcher"} scenarios={scenarios} initialScenarioId={initialScenarioId} preview={preview} />;
+  return <NativeStart key={`${initialScenarioId || "launcher"}-${initialMode}`} scenarios={scenarios} initialScenarioId={initialScenarioId} initialMode={initialMode} preview={preview} />;
 }
 
 export default function NativePage({ searchParams }: { searchParams: Query }) {

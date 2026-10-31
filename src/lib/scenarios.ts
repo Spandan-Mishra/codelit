@@ -129,6 +129,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "agent-two-sum",
     title: "Pair Sum",
+    blurb: "Find two numbers that add to a target and return their positions. Walk the list once, remembering each number seen: for two_sum([2, 7, 11, 15], 9), 9 - 2 = 7 is already seen, so the answer is [0, 1].",
     difficulty: "Easy",
     tags: ["Hash Map", "Arrays"],
     minutes: 20,
@@ -167,6 +168,7 @@ export const SCENARIOS: Scenario[] = [
   {
     id: "agent-merge-intervals",
     title: "Merge Sweep",
+    blurb: "Fold overlapping time ranges into one clean cover. Sort by start, then sweep: [1, 3] and [2, 6] overlap into [1, 6], while [8, 10] and [15, 18] stand alone.",
     difficulty: "Medium",
     tags: ["Sorting", "Intervals"],
     minutes: 25,

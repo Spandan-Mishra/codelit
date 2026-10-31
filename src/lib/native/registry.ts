@@ -12,6 +12,7 @@ import {
   NATIVE_LEASE_MS,
   PAIR_TTL_MS,
   type AdapterCapabilities,
+  type AttemptMode,
   type BrowserCommand,
   type BrowserCommandType,
   type DeviceRecord,
@@ -139,12 +140,13 @@ export async function revokeDevice(sessionId: string, deviceId: string): Promise
 
 // --- Native attempts (file-backed, stable owned ids) ---
 
-export async function createAttempt(sessionId: string, scenarioId: string, seed: number, language: string): Promise<NativeAttempt> {
+export async function createAttempt(sessionId: string, scenarioId: string, seed: number, language: string, mode: AttemptMode = "practice"): Promise<NativeAttempt> {
   const now = Date.now();
   const a: NativeAttempt = {
     id: newId("nat"),
     sessionId,
     scenarioId,
+    mode,
     seed,
     stage: 1,
     language,

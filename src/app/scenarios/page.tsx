@@ -13,8 +13,8 @@ export default function ScenariosPage() {
         Your agent writes the solution. You decide what to ask, what to check, and when it is ready.
       </p>
 
-      <p className="mt-3 font-ui text-xs text-[#8a877d]">Progress is saved for this browser. Solved means all code acceptance checks passed.</p>
-      <ScenarioList scenarios={SCENARIOS.map(({ id, title, difficulty, tags, minutes, timePar, promptPar }) => ({ id, title, difficulty, tags, minutes, timePar, promptPar }))} />
+      <p className="mt-3 font-ui text-xs text-[#8a877d]">Progress is saved for this browser. Solved means all code acceptance checks passed. Pass 5 practice scenarios to unlock Ranked.</p>
+      <ScenarioList scenarios={SCENARIOS.map(({ id, title, blurb, difficulty, tags, minutes, timePar, promptPar }) => ({ id, title, blurb, difficulty, tags, minutes, timePar, promptPar }))} />
     </div>
   );
 }

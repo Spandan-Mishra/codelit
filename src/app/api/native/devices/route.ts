@@ -22,7 +22,7 @@ export async function GET(req: Request) {
       const events = await readEvents(a.id, -1);
       const check = events.filter((e) => e.type === "official.test" && e.payload.scope === "visible").at(-1);
       return {
-        ...a, title: a.title || scenario?.title || a.scenarioId,
+        ...a, mode: a.mode || "practice", title: a.title || scenario?.title || a.scenarioId,
         scenarioTitle: scenario?.title || a.scenarioId, shortId: a.id.slice(-8), archivedAt: a.archivedAt || null,
         progress: { stage: a.stage, totalStages: 3, turnsUsed: a.turnsUsed, turnsReserved: a.turnsReserved,
           promptLimit: scenario?.promptPar || 0, hasSolution: events.some((e) => e.type === "file.revision" && typeof e.payload.rev === "number" && e.payload.rev > 0),
