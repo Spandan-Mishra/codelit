@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { limited, clientIp } from "@/lib/ratelimit";
 import { authDevice, saveAttempt, saveDevice } from "@/lib/native/registry";
-import { appendEvent, lastSourceSeq, recordServerEvent } from "@/lib/native/events";
+import { appendEvent, hasIssuedTurn, lastSourceSeq, recordServerEvent } from "@/lib/native/events";
 import { attemptEpoch, getAttempt, getSessionLeases, pendingFreeze } from "@/lib/native/registry";
 import { sanitizeConnectorEvent } from "@/lib/native/protocol";
 import { checkAttemptPath, checkSnapshot, snapshotHash, solutionHash } from "@/lib/native/workspace";
@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         // this server reserved, so a replayed/foreign terminal cannot move
         // budgets or state (F06). Terminal dedupe stays keyed per turn below.
         if ((event.type === "turn.started" || event.type === "turn.completed" || event.type === "turn.failed" || event.type === "turn.interrupted") &&
-            (!event.turnId || !await storeGet("kv", `issuedturn:${event.attemptId}:${event.turnId}`))) {
+            !await hasIssuedTurn(event.attemptId, event.turnId)) {
           return NextResponse.json({ error: "Unknown turn id for this attempt.", accepted }, { status: 409 });
         }
         const current = epoch === undefined || epoch === expected;

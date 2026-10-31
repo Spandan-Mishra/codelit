@@ -88,6 +88,19 @@ export async function readEvents(attemptId: string, sinceSeq: number): Promise<N
   return log.events.filter((e) => e.seq > sinceSeq);
 }
 
+// Attempts created before the issued-turn index was added still have their
+// authoritative prompt.accepted record. Recover that index from server
+// evidence, never from a connector's assertion that a turn existed.
+export async function hasIssuedTurn(attemptId: string, turnId: string | null): Promise<boolean> {
+  if (!turnId) return false;
+  const key = `issuedturn:${attemptId}:${turnId}`;
+  if (await storeGet("kv", key)) return true;
+  const log = await loadLog(attemptId);
+  if (!log.events.some((event) => event.source === "codelit" && event.type === "prompt.accepted" && event.turnId === turnId)) return false;
+  await storeSet("kv", key, true);
+  return true;
+}
+
 export async function lastSourceSeq(attemptId: string): Promise<number> {
   const log = await loadLog(attemptId);
   return log.lastSourceSeq;
