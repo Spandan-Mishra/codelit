@@ -90,7 +90,7 @@ async function baseArgs(dir: string): Promise<string[]> {
     try { await access(p); args.push("--ro-bind", p, p); } catch { /* optional system directory */ }
   }
   for (const p of ["/bin", "/lib", "/lib64"]) {
-    try { args.push("--ro-bind", await realpath(p), p); } catch { /* optional ABI directory */ }
+    try { args.push("--ro-bind", await realpath(/* turbopackIgnore: true */ p), p); } catch { /* optional ABI directory */ }
   }
   args.push("--proc", "/proc", "--dev", "/dev", "--size", String(EXECUTION_LIMITS.shmBytes), "--tmpfs", "/dev/shm",
     "--remount-ro", "/dev", "--remount-ro", "/proc", "--size", String(EXECUTION_LIMITS.tmpBytes), "--tmpfs", "/tmp",
