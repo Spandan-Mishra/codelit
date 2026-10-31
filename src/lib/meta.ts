@@ -62,16 +62,48 @@ const ROUND_FOCUS = [
   "complexity and trade-off",
 ];
 
+export type DefenseLens = "code" | "design" | "prompts";
+
+const LENS_INSTRUCTION: Record<DefenseLens, string> = {
+  code: "Focus on a QUOTED code excerpt from their solution: make them explain, trace, or defend one exact line.",
+  design: "Focus on a DESIGN choice: complexity, trade-offs, scaling limits, or what they would rewrite under new constraints.",
+  prompts: "Focus on THEIR process: which prompt, decision, or failure shaped the solution, and what it changed in the code.",
+};
+
 export function fallbackQuestion(
   round: number,
   problemTitle: string,
   code: string,
   fnName: string,
   history: { question: string; answer: string }[],
-  traceSummary?: string
+  traceSummary?: string,
+  lens?: DefenseLens
 ): string {
   const f = analyzeCode(code, fnName);
   const seed = (code.length + round * 17 + history.length * 7) % 3;
+  if (lens === "code") {
+    const line = (f.condLine || f.loopLine).slice(0, 70);
+    const variants = [
+      `From your own solution, quote what this line does on the smallest non-trivial input, step by step: \`${line}\`. You have 90 seconds; a generic answer will not match your line.`,
+      `Live mutation: I flip the comparison/boundary by one in your line \`${line}\`. Name the smallest input that now fails and trace why. You have 90 seconds; a pasted generic answer will not match your line.`,
+      `I delete one line from your solution — the one your correctness depends on most. Which line, and which test catches the deletion first?`,
+    ];
+    return variants[seed];
+  }
+  if (lens === "design") {
+    const variants = [
+      `State your time and space complexity and name the input size where your approach becomes the wrong choice. What would you switch to, and what breaks in your current code first?`,
+      `If the input were streamed and 100× larger than memory, which line of your code fails first? Sketch the change in words — no new code needed.`,
+      `Trade-off round: your solution optimizes one thing and sacrifices another. Name both, and give the constraint change that would make you rewrite it.`,
+    ];
+    return variants[seed];
+  }
+  if (lens === "prompts") {
+    if (traceSummary) {
+      return `Your trace shows ${traceSummary}. Which single prompt or decision moved your run forward the most — and what exactly did it change in the code? Quote the line. You have 90 seconds; a generic answer will not match your trace.`;
+    }
+    return `No trace was captured for this run, so defend your process from memory: which single instruction or decision shaped your final solution most — and what exactly did it change in the code? Quote the line.`;
+  }
   if (round === 0) {
     // Trace-grounded defense: round 1 asks about the decision that drove the run.
     if (traceSummary) {
@@ -138,15 +170,19 @@ export async function nextQuestion(args: {
   fnName: string;
   history: { question: string; answer: string }[];
   traceSummary?: string;
+  lens?: DefenseLens;
 }): Promise<{ question: string; engine: string }> {
   const traceLine = args.traceSummary ? ` Candidate trace: ${args.traceSummary}.` : "";
+  const lensLine = args.lens ? ` ${LENS_INSTRUCTION[args.lens]}` : "";
   const live = await callMeta([
     {
       role: "system",
       content:
         "You are Codelit's interrogator. Ask ONE short defense question. Round focus: " +
         ROUND_FOCUS[args.round] +
-        ". Reference the candidate's actual code lines." +
+        "." +
+        lensLine +
+        " Reference the candidate's actual code lines." +
         (args.traceSummary ? " Reference their trace (prompts, reverts, decision points)." : "") +
         " Make it personalized and timed so a generic pasted AI answer does not fit. No preamble, just the question.",
     },
@@ -156,7 +192,7 @@ export async function nextQuestion(args: {
     },
   ]);
   if (live) return { question: live.trim(), engine: INTERROGATE_MODEL };
-  return { question: fallbackQuestion(args.round, args.problemTitle, args.code, args.fnName, args.history, args.traceSummary), engine: "offline" };
+  return { question: fallbackQuestion(args.round, args.problemTitle, args.code, args.fnName, args.history, args.traceSummary, args.lens), engine: "offline" };
 }
 
 export async function gradeAnswer(args: {

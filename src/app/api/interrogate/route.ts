@@ -21,6 +21,8 @@ export async function POST(req: Request) {
   const traceSummary = typeof body.traceSummary === "string" && body.traceSummary ? body.traceSummary.slice(0, 300) : undefined;
   if (body.action === "question") {
     const history = (Array.isArray(body.history) ? body.history : []).slice(-MAX_HISTORY);
+    const lensRaw = String(body.lens || "");
+    const lens = lensRaw === "code" || lensRaw === "design" || lensRaw === "prompts" ? lensRaw : undefined;
     const out = await nextQuestion({
       round: Math.min(2, Math.max(0, Number(body.round) || 0)),
       problemTitle: String(body.problemTitle || problem?.title || "Problem").slice(0, 200),
@@ -29,6 +31,7 @@ export async function POST(req: Request) {
       fnName: String(body.fnName || problem?.fnName || "solve").slice(0, 64),
       history,
       traceSummary,
+      lens,
     });
     return NextResponse.json(out);
   }

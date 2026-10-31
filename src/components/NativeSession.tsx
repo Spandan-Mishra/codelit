@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Bot, Check, CheckCheck, ChevronDown, Circle, CircleAlert, Code2, FileCode2, FlaskConical, Layers, LoaderCircle, LockKeyhole, RefreshCw, Send, ShieldAlert, Square, Terminal, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, Bot, Check, CheckCheck, ChevronDown, Circle, CircleAlert, Code2, FileCode2, FlaskConical, Layers, LoaderCircle, LockKeyhole, RefreshCw, Send, ShieldAlert, ShieldCheck, Square, Terminal, Wifi, WifiOff } from "lucide-react";
 import type { AdapterCapabilities, NativeAttempt, NativeEvent } from "@/lib/native/protocol";
 import SessionMarkdown from "./SessionMarkdown";
 import AttemptPreparation from "./AttemptPreparation";
+import DefenseDialog from "./DefenseDialog";
 
 type SessionAttempt = NativeAttempt & { model?: string | null; title?: string; archivedAt?: number | null };
 type SessionAdapter = AdapterCapabilities & { status?: string; message?: string; models?: { id: string; label: string }[] };
@@ -126,6 +127,7 @@ function SessionWorkspace({ attemptId }: { attemptId: string }) {
   const [finishRetry, setFinishRetry] = useState(0);
   const [selection, setSelection] = useState<{ adapter: string; model: string } | null>(null);
   const [viewedStage, setViewedStage] = useState<number | null>(null);
+  const [defenseOpen, setDefenseOpen] = useState(false);
   const [now, setNow] = useState(0);
   const sinceRef = useRef(-1);
   const loadingRef = useRef(false);
@@ -269,6 +271,13 @@ function SessionWorkspace({ attemptId }: { attemptId: string }) {
   const checksPassed = checksCurrent && typeof visibleCheck?.payload.totalCount === "number" && visibleCheck.payload.totalCount > 0 && visibleCheck.payload.passedCount === visibleCheck.payload.totalCount;
   const budgetUsed = (attempt?.turnsUsed ?? 0) + (attempt?.turnsReserved ?? 0);
   const budgetExhausted = scenario ? budgetUsed >= scenario.promptPar : false;
+  // Defense inputs, derived from the finished attempt. Efficiency is prompt
+  // par discipline: on-par runs score 100, each prompt over par costs 10.
+  const promptsUsed = attempt?.turnsUsed ?? 0;
+  const defenseEfficiency = scenario ? Math.max(0, 100 - 10 * Math.max(0, promptsUsed - scenario.promptPar)) : 0;
+  const agentTurns = events.filter((event) => event.type === "turn.completed").length;
+  const defenseTraceSummary = scenario ? `${promptsUsed} prompts (par ${scenario.promptPar}), ${agentTurns} agent turns across ${totalStages} stages` : "";
+  const defenseStatement = releasedStages.map((s) => `Stage ${s.stage} — ${s.title}: ${s.brief}`).join("\n");
   const resolvedApprovals = new Set(events.filter((event) => event.type === "approval.decided" || event.type === "approval.expired").map((event) => String(event.payload.approvalId || "")));
   const terminalTurns = new Set(events.filter((event) => ["turn.completed", "turn.failed", "turn.interrupted"].includes(event.type)).map((event) => event.turnId));
   const approvals = events.filter((event) => event.type === "approval.requested" && event.turnId && !terminalTurns.has(event.turnId) && event.nativeSessionId === attempt?.nativeSessionId && !resolvedApprovals.has(String(event.payload.approvalId || "")) && typeof event.payload.expiresAt === "number" && event.payload.expiresAt > now);
@@ -394,10 +403,26 @@ function SessionWorkspace({ attemptId }: { attemptId: string }) {
           <div className="space-y-4 border-t border-[#2c3026] p-4"><p className="text-[11px] leading-6 text-[#929f83]">{closed ? "This is the saved solution for this attempt." : "To change this file, ask your agent in chat. Run checks on the latest revision before advancing."}</p><button disabled={!idle || !ready || !revision} onClick={() => void post("test")} className={`${button} w-full`}><FlaskConical size={15} />{pending === "test" ? "Running visible checks…" : "Run visible checks"}</button>{visibleCheck && <div className={`rounded-lg border p-3 text-xs leading-6 ${checksCurrent ? checksPassed ? "border-emerald-400/20 bg-emerald-400/5 text-emerald-200" : "border-red-400/20 bg-red-400/5 text-red-200" : "border-[#343b2b] text-[#99a78a]"}`}><p>{checksCurrent ? `Stage ${String(visibleCheck.payload.stage)} · ${String(visibleCheck.payload.passedCount)}/${String(visibleCheck.payload.totalCount)} visible checks passed` : "Previous check results · run again for the current file and stage"}</p><CheckResults event={visibleCheck} /></div>}
             <div className="border-t border-[#2c3026] pt-4"><p className="mb-3 text-[11px] leading-6 text-[#929f83]">Final evaluation freezes your solution and runs the full acceptance suite, including hidden tests.</p><button disabled={!idle || !ready || !revision || attempt.stage < totalStages} onClick={() => void finish()} className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[#e8b33d] px-4 py-2.5 text-xs font-semibold text-[#17190e] transition hover:bg-[#f0c15d] disabled:cursor-not-allowed disabled:opacity-40"><CheckCheck size={15} />{pending === "finish" ? "Freezing solution…" : "Finish & evaluate"}</button>{attempt.stage < totalStages && <p className="mt-2 text-center text-[10px] text-[#89977a]">Unlock all {totalStages} stages before finishing.</p>}</div>
             {isFinishing && <div role="status" className="rounded-lg border border-[#e8b33d]/25 bg-[#e8b33d]/5 p-3 text-xs leading-6 text-[#d4be8e]"><p className="flex items-start gap-2"><LoaderCircle size={14} className={`mt-1 shrink-0 ${finishState === "waiting" ? "animate-spin" : ""}`} />{finishState === "retry" ? "Evaluation needs attention. Your attempt is preserved." : "Waiting for the frozen solution, then evaluating. You can reload this page safely."}</p><div className="mt-3 flex flex-wrap gap-2">{finishState === "retry" && <button className={button} disabled={busy} onClick={() => { setNotice(""); setFinishRetry((value) => value + 1); }}><RefreshCw size={12} /> Retry evaluation</button>}<button className={button} disabled={busy} onClick={async () => { const data = await post("reopen"); if (data?.ok) setAttempt((current) => current ? { ...current, status: "open" } : current); }}>Return to solving</button></div></div>}
-            {attempt.acceptance && <div role="status" className={`rounded-xl border p-4 ${attempt.acceptance.passed ? "border-emerald-400/30 bg-emerald-400/7 text-emerald-200" : "border-red-400/25 bg-red-400/5 text-red-200"}`}><p className="flex items-center gap-2 text-sm font-semibold">{attempt.acceptance.passed ? <CheckCheck size={17} /> : <CircleAlert size={17} />}{attempt.acceptance.passed ? "Challenge accepted" : "Evaluation complete"}</p><p className="mt-2 text-xs">{attempt.acceptance.passedCount}/{attempt.acceptance.totalCount} full acceptance checks passed.</p>{attempt.submissionHash && <p className="mt-2 break-all font-code text-[10px] opacity-65" title={attempt.submissionHash}>Snapshot {attempt.submissionHash.slice(0, 16)}</p>}<Link href="/native" className="mt-4 inline-flex items-center gap-1 text-xs underline underline-offset-4">Back to attempts <ArrowRight size={12} /></Link></div>}
+            {attempt.acceptance && <div role="status" className={`rounded-xl border p-4 ${attempt.acceptance.passed ? "border-emerald-400/30 bg-emerald-400/7 text-emerald-200" : "border-red-400/25 bg-red-400/5 text-red-200"}`}><p className="flex items-center gap-2 text-sm font-semibold">{attempt.acceptance.passed ? <CheckCheck size={17} /> : <CircleAlert size={17} />}{attempt.acceptance.passed ? "Challenge accepted" : "Evaluation complete"}</p><p className="mt-2 text-xs">{attempt.acceptance.passedCount}/{attempt.acceptance.totalCount} full acceptance checks passed.</p>{attempt.submissionHash && <p className="mt-2 break-all font-code text-[10px] opacity-65" title={attempt.submissionHash}>Snapshot {attempt.submissionHash.slice(0, 16)}</p>}<div className="mt-4 flex flex-wrap gap-2"><button onClick={() => setDefenseOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-[#e8b33d] px-4 py-2 text-xs font-semibold text-[#17190e] transition hover:bg-[#f0c15d]"><ShieldCheck size={14} /> Finish & proceed to defense</button><Link href="/native" className="inline-flex items-center gap-1 px-2 py-2 text-xs underline underline-offset-4">Back to attempts <ArrowRight size={12} /></Link></div></div>}
           </div>
         </section>
       </div>
+      {attempt.acceptance && scenario && defenseOpen && (
+        <DefenseDialog
+          open={defenseOpen}
+          onClose={() => setDefenseOpen(false)}
+          scenarioId={attempt.scenarioId}
+          problemTitle={scenario.title}
+          statement={defenseStatement}
+          code={code}
+          fnName={scenario.fnName}
+          traceSummary={defenseTraceSummary}
+          passedCount={attempt.acceptance.passedCount}
+          totalCount={attempt.acceptance.totalCount}
+          traceScore0_100={defenseEfficiency}
+          promptsUsed={promptsUsed}
+        />
+      )}
     </div>
   );
 }
