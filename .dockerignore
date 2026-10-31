@@ -1,5 +1,6 @@
 node_modules
 .next
+.codelit-runtime
 .git
 npm-debug.log*
 .env*
