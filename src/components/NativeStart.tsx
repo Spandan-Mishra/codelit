@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, ArchiveRestore, ArrowRight, Bot, Check, Pencil, RefreshCw, Send, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowRight, Bot, Check, Pencil, RefreshCw, Trash2, X } from "lucide-react";
 import NativeConnect, { adapterIsReady, adapterLabel, deviceIsOnline, useNativeDevices } from "@/components/NativeConnect";
+import AttemptPreparation from "@/components/AttemptPreparation";
 import SessionMarkdown from "@/components/SessionMarkdown";
 import type { NativeAdapterId } from "@/lib/native/protocol";
 
@@ -67,6 +68,7 @@ const statusLabels: Record<string, string> = { open: "Ready to continue", runnin
 export default function NativeStart({ scenarios, initialScenarioId, preview }: { scenarios: Scenario[]; initialScenarioId?: string; preview?: ScenarioPreview }) {
   const router = useRouter();
   const [changingScenario, changeScenario] = useTransition();
+  const [openingAttempt, openAttempt] = useTransition();
   const { devices, loading, error: deviceError, now, refresh } = useNativeDevices();
   const [attempts, setAttempts] = useState<Attempt[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -78,8 +80,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
   const [model, setModel] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const sending = useRef(false);
-  const [prompt, setPrompt] = useState("");
+  const startingRef = useRef(false);
   const [createdAttemptId, setCreatedAttemptId] = useState("");
   const [mutatingId, setMutatingId] = useState("");
   const [editingId, setEditingId] = useState("");
@@ -156,7 +157,8 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
 
   const sample = preview?.id === scenarioId ? preview : undefined;
   const resumable = liveAttempts.filter((attempt) => attempt.scenarioId === scenarioId && !attempt.archivedAt && attempt.status !== "done");
-  const locked = busy || !!createdAttemptId;
+  const preparing = busy || openingAttempt;
+  const locked = preparing || !!createdAttemptId;
 
   function selectScenario(id: string) {
     if (!scenarios.some((item) => item.id === id)) return;
@@ -164,13 +166,8 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
     changeScenario(() => router.replace(`/native?scenario=${encodeURIComponent(id)}`, { scroll: false }));
   }
 
-  async function sendFirstPrompt() {
-    if (sending.current || createdAttemptId) return;
-    const text = prompt.trim();
-    if (!text || text.length > 6000) {
-      setError("Write a prompt between 1 and 6000 characters.");
-      return;
-    }
+  async function startAttempt() {
+    if (startingRef.current || createdAttemptId) return;
     if (!scenarioId || !device || !provider || !deviceIsOnline(device, now) || !adapterIsReady(provider)) {
       setError("Connect an online computer with a ready provider first.");
       void refresh();
@@ -180,7 +177,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
       setError("That model is no longer advertised by your agent. Choose an available model.");
       return;
     }
-    sending.current = true;
+    startingRef.current = true;
     setBusy(true);
     setError("");
     let createdId = "";
@@ -193,20 +190,14 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
       if (!res.ok || typeof data.attempt?.id !== "string") throw new Error(data.error || "Could not start this attempt.");
       createdId = data.attempt.id;
       setCreatedAttemptId(createdId);
-      const sent = await fetch("/api/native/session", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ op: "send", attemptId: createdId, text }),
-      });
-      const result = await sent.json();
-      if (!sent.ok) throw new Error(result.error || "Could not confirm your first prompt was sent.");
-      router.push(`/native/${encodeURIComponent(createdId)}`);
+      openAttempt(() => router.push(`/native/${encodeURIComponent(createdId)}`));
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Could not send your prompt.";
-      setError(createdId ? `Your attempt was created, but sending the prompt could not be confirmed. ${message} Open it below to check the conversation before sending again.` : message);
+      const message = e instanceof Error ? e.message : "Could not start your attempt.";
+      setError(createdId ? `Your attempt was created, but the workspace could not open. ${message} Use the link below to open it.` : message);
       void refresh();
       void loadHistory();
     } finally {
-      sending.current = false;
+      startingRef.current = false;
       setBusy(false);
     }
   }
@@ -275,7 +266,8 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
   const connection = !loading && !readyDevices.length ? <NativeConnect continueHref={returnHref} inline onConnected={refresh} /> : null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:py-8" aria-busy={preparing}>
+      {preparing && <AttemptPreparation fullScreen title={scenario?.title} attemptHref={createdAttemptId ? `/native/${encodeURIComponent(createdAttemptId)}` : undefined} />}
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#30322c] pb-5">
         <div>
           <div className="flex items-center gap-2 font-ui text-xs text-[#9a968c]"><Link href="/scenarios" className="hover:text-[#e8b33d]">Scenarios</Link><span>/</span><span>{scenario ? "Solving workspace" : "Agent workspace"}</span></div>
@@ -299,14 +291,14 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
             <div className="min-w-0"><p className="break-words text-sm text-[#ece9e2]">{attempt.title || scenario.title}</p><p className="mt-1 text-xs text-[#b3afa3]"><span title={attempt.id} className="font-code text-[#e8b33d]">#{attempt.shortId || attempt.id.slice(-8)}</span> · Stage {attempt.progress?.stage || attempt.stage || 1}/3 · {attempt.progress?.turnsUsed ?? attempt.turnsUsed ?? 0} prompts</p><p className="mt-1 text-xs text-[#9a968c]">{statusLabels[attempt.status] || attempt.status}</p></div>
             <span className="shrink-0 text-sm font-semibold text-[#e8b33d]">Resume →</span>
           </Link></li>)}</ul>
-          <p className="mt-3 text-xs text-[#b3afa3]">Resume keeps your code and conversation. Sending below starts a separate attempt.</p>
+          <p className="mt-3 text-xs text-[#b3afa3]">Resume keeps your code and conversation. Start attempt creates a separate workspace.</p>
         </section>}
 
         <div className="mt-5 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section aria-label="Stage one problem" className="min-w-0 overflow-hidden rounded-xl border border-[#30322c] bg-[#141613] font-ui">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#30322c] px-5 py-3 text-xs"><span className="font-semibold text-[#e8b33d]">Stage 1 of 3 · {sample.stageTitle}</span><span className="text-[#9a968c]">{sample.difficulty} · {sample.minutes} min · {sample.promptPar} prompts</span></div>
             <div className="p-5 sm:p-6">
-              <p className="mb-4 rounded-md border border-[#3a3c37] bg-black/20 px-3 py-2 text-xs leading-5 text-[#b3afa3]"><span className="font-semibold text-[#efcf88]">Sample preview.</span> Each attempt gets its own brief and example values. Your exact requirements appear in the workspace after the first Send.</p>
+              <p className="mb-4 rounded-md border border-[#3a3c37] bg-black/20 px-3 py-2 text-xs leading-5 text-[#b3afa3]"><span className="font-semibold text-[#efcf88]">Sample preview.</span> Each attempt gets its own brief and example values. Your exact requirements appear when you start an attempt.</p>
               <h2 className="mb-3 text-base font-semibold">{sample.stageTitle}</h2>
               <SessionMarkdown text={sample.brief} />
               {sample.visibleTests.length > 0 && <div className="mt-5"><h3 className="text-xs font-semibold text-[#b3afa3]">Sample example{sample.visibleTests.length === 1 ? "" : "s"}</h3><div className="mt-2 space-y-2">{sample.visibleTests.map((test, index) => <dl key={index} className="rounded-md border border-[#30322c] bg-black/20 p-3 text-xs"><dt className="text-[#9a968c]">Input</dt><dd className="mt-1 overflow-x-auto whitespace-pre font-code leading-6 text-[#e0ded5]">{test.input}</dd><dt className="mt-2 text-[#9a968c]">Expected output</dt><dd className="mt-1 overflow-x-auto whitespace-pre font-code leading-6 text-[#e0ded5]">{test.expected}</dd></dl>)}</div></div>}
@@ -325,21 +317,20 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
 
           <div className="min-w-0 space-y-5">
             <section aria-label="Agent workspace" className="rounded-xl border border-[#30322c] bg-[#141613] p-5 font-ui sm:p-6">
-              <div className="mb-5 flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-base font-semibold"><Bot className="h-4 w-4 text-[#e8b33d]" />Your agent</h2><span className="text-xs text-[#9a968c]">{busy ? "Starting your attempt…" : createdAttemptId ? "Attempt created" : "Draft · nothing sent"}</span></div>
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-base font-semibold"><Bot className="h-4 w-4 text-[#e8b33d]" />Your agent</h2><span className="text-xs text-[#9a968c]">{preparing ? "Starting your attempt…" : createdAttemptId ? "Attempt created" : "Ready to start"}</span></div>
               {settings}
-              <p role="status" className={`mt-3 text-xs leading-5 ${device && provider ? "text-emerald-300" : "text-[#e8b33d]"}`}>{device && provider ? `Relay online · ${adapterLabel(provider.adapter)} preflight ready` : loading ? "Checking your paired computers…" : "Connect your agent below. Your scenario, language, and prompt stay here while you set up."}</p>
+              <p role="status" className={`mt-3 text-xs leading-5 ${device && provider ? "text-emerald-300" : "text-[#e8b33d]"}`}>{device && provider ? `Relay online · ${adapterLabel(provider.adapter)} preflight ready` : loading ? "Checking your paired computers…" : "Connect your agent below. Your scenario and configuration stay here while you set up."}</p>
               <p className="mt-2 text-xs leading-5 text-[#9a968c]">Models come from your installed agent. Local provider usage and billing apply.</p>
-              <p role="status" className="mt-3 rounded-md border border-[#3a3c37] bg-black/20 px-3 py-2 text-xs leading-5 text-[#ece9e2]">Solving with: {device ? device.label : "no computer selected"} · {provider ? adapterLabel(provider.adapter) : "no provider selected"} · {selectedModel ? models.find((item) => item.id === selectedModel)?.label || selectedModel : "agent default model"}. Change any of these above before you send.</p>
-              <form onSubmit={(event) => { event.preventDefault(); void sendFirstPrompt(); }} className="mt-5 border-t border-[#30322c] pt-5">
-                <label htmlFor="first-agent-prompt" className="block text-sm font-semibold">Prompt box — prompt your agent</label>
-                <p id="first-prompt-help" className="mt-2 text-xs leading-5 text-[#b3afa3]">Tell your agent how to approach the problem. Your prompt travels with your run’s exact brief, examples, and starter file.</p>
-                <textarea id="first-agent-prompt" aria-describedby="first-prompt-help" value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={6000} disabled={busy} rows={6} placeholder="Ask your agent to explain an approach, implement the solution, and check the example…" className={`${inputClass} min-h-36 resize-y leading-6 focus:border-[#e8b33d]/60`} />
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-3"><span className="text-xs text-[#9a968c]">{prompt.length}/6000</span><button type="submit" disabled={locked || !prompt.trim() || !device || !provider} className="inline-flex items-center justify-center gap-2 rounded-md bg-[#e8b33d] px-5 py-2.5 text-sm font-semibold text-black hover:bg-[#f2c14e] disabled:opacity-40">{busy ? "Sending…" : createdAttemptId ? "Attempt created" : "Send"}<Send className="h-4 w-4" /></button></div>
-                <p className="mt-3 text-xs leading-5 text-[#9a968c]">First Send creates an attempt and queues your first prompt. Your agent waits for your prompt before solving.</p>
+              <p role="status" className="mt-3 rounded-md border border-[#3a3c37] bg-black/20 px-3 py-2 text-xs leading-5 text-[#ece9e2]">Solving with: {device ? device.label : "no computer selected"} · {provider ? adapterLabel(provider.adapter) : "no provider selected"} · {selectedModel ? models.find((item) => item.id === selectedModel)?.label || selectedModel : "agent default model"}. Change these above before starting.</p>
+              <div className="mt-5 border-t border-[#30322c] pt-5">
+                <h3 className="text-sm font-semibold">Ready for your attempt?</h3>
+                <p className="mt-2 text-xs leading-6 text-[#b3afa3]">Open your workspace with its own question variant, agent chat, and solution file. Write your first prompt there when you are ready.</p>
+                <button type="button" onClick={() => void startAttempt()} disabled={locked || !device || !provider} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#e8b33d] px-5 py-3 text-sm font-semibold text-black hover:bg-[#f2c14e] disabled:opacity-40">{preparing ? "Preparing your attempt…" : createdAttemptId ? "Attempt created" : "Start attempt"}<ArrowRight className="h-4 w-4" /></button>
+                <p className="mt-3 text-xs leading-5 text-[#9a968c]">Starting sets up the workspace. Your agent begins solving only after you send a prompt on the attempt page.</p>
                 {(error || deviceError) && <p role="alert" className="mt-3 text-sm leading-6 text-[#e8b33d]">{error || deviceError}</p>}
                 {createdAttemptId && <Link href={`/native/${encodeURIComponent(createdAttemptId)}`} className="mt-3 inline-flex items-center gap-2 rounded-md border border-[#e8b33d]/50 px-3 py-2 text-sm font-semibold text-[#e8b33d]">Open created attempt <span className="font-code">#{createdAttemptId.slice(-8)}</span><ArrowRight className="h-4 w-4" /></Link>}
-              </form>
-              <ol aria-label="What to do" className="mt-5 grid gap-3 border-t border-[#30322c] pt-4 text-xs leading-5 text-[#b3afa3] sm:grid-cols-2"><li><span className="font-semibold text-[#e8b33d]">1.</span> Read the stage brief on the left, then write your first prompt in the prompt box.</li><li><span className="font-semibold text-[#e8b33d]">2.</span> Send once — your agent implements the solution file and explains its approach.</li><li><span className="font-semibold text-[#e8b33d]">3.</span> Review the revisioned file, run visible checks, and iterate by prompting.</li><li><span className="font-semibold text-[#e8b33d]">4.</span> Unlock stages 2–3, then finish for full acceptance grading.</li></ol>
+              </div>
+              <ol aria-label="What to do" className="mt-5 grid gap-3 border-t border-[#30322c] pt-4 text-xs leading-5 text-[#b3afa3] sm:grid-cols-2"><li><span className="font-semibold text-[#e8b33d]">1.</span> Read the question and choose your agent and model.</li><li><span className="font-semibold text-[#e8b33d]">2.</span> Start an attempt to open your dedicated workspace.</li><li><span className="font-semibold text-[#e8b33d]">3.</span> Prompt your agent there, review its code, and run checks.</li><li><span className="font-semibold text-[#e8b33d]">4.</span> Unlock stages 2–3, then finish for code acceptance.</li></ol>
               {unavailableDevices.length > 0 && <details className="mt-4 border-t border-[#30322c] pt-4 text-xs"><summary className="cursor-pointer text-[#b3afa3]">{unavailableDevices.length} unavailable computer{unavailableDevices.length === 1 ? "" : "s"}</summary><ul className="mt-3 space-y-3 text-[#b3afa3]">{unavailableDevices.map((item) => <li key={item.deviceId}><span className="font-medium text-[#ece9e2]">{item.label}</span><p className="mt-1 leading-5">{!deviceIsOnline(item, now) ? "Relay offline. Start the existing connector; you do not need to pair again." : item.adapters.map((report) => `${adapterLabel(report.adapter)}: ${report.message || report.status || "readiness unknown; update the connector"}`).join(" · ") || "No provider reported. Update and restart the connector."}</p></li>)}</ul></details>}
             </section>
             {connection}
@@ -350,7 +341,7 @@ export default function NativeStart({ scenarios, initialScenarioId, preview }: {
         <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)]">
           <section aria-label="New attempt" className="rounded-xl border border-[#30322c] bg-[#141613] p-5 font-ui sm:p-6">
             <h2 className="flex items-center gap-2 text-base font-semibold"><Bot className="h-4 w-4 text-[#e8b33d]" />Start a challenge</h2>
-            <p className="mt-3 text-sm leading-6 text-[#b3afa3]">Choose a scenario to open its problem, starter file, and agent composer.</p>
+            <p className="mt-3 text-sm leading-6 text-[#b3afa3]">Choose a scenario to open its problem, starter file, and agent configuration.</p>
             <label className="mt-5 block text-xs text-[#b3afa3]">Scenario<select disabled={changingScenario} value="" onChange={(event) => selectScenario(event.target.value)} className={inputClass}><option value="" disabled>{changingScenario ? "Opening scenario…" : "Choose a scenario"}</option>{scenarios.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label>
             <Link href="/scenarios" className="mt-4 inline-flex items-center gap-2 text-sm text-[#e8b33d] hover:underline">Browse all scenarios<ArrowRight className="h-4 w-4" /></Link>
           </section>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, Bot, Check, CheckCheck, ChevronDown, Circle, CircleAlert, Code2, FileCode2, FlaskConical, Layers, LoaderCircle, LockKeyhole, RefreshCw, Send, ShieldAlert, Square, Terminal, Wifi, WifiOff } from "lucide-react";
 import type { AdapterCapabilities, NativeAttempt, NativeEvent } from "@/lib/native/protocol";
 import SessionMarkdown from "./SessionMarkdown";
+import AttemptPreparation from "./AttemptPreparation";
 
 type SessionAttempt = NativeAttempt & { model?: string | null; title?: string; archivedAt?: number | null };
 type SessionAdapter = AdapterCapabilities & { status?: string; message?: string; models?: { id: string; label: string }[] };
@@ -311,10 +312,12 @@ function SessionWorkspace({ attemptId }: { attemptId: string }) {
     }
   }
 
+  if (!attempt && !loadError) return <AttemptPreparation />;
+
   if (!attempt) return <div className="mx-auto max-w-7xl px-4 py-12 font-ui"><Link href="/native" className="inline-flex items-center gap-2 text-xs text-[#a5a997] hover:text-[#e8b33d]"><ArrowLeft size={14} /> All attempts</Link><div className="mt-8 rounded-xl border border-[#30322c] bg-[#141613] p-8 text-sm">{loadError ? <><p role="alert" className="text-red-300">{loadError}</p><button className={`${button} mt-4`} onClick={() => void load()}><RefreshCw size={14} /> Retry loading</button></> : <p role="status" className="flex items-center gap-2 text-[#a5a997]"><LoaderCircle size={16} className="animate-spin" /> Loading your workspace…</p>}</div></div>;
 
   return (
-    <div className="mx-auto max-w-[1800px] px-4 py-6 font-ui sm:px-6 lg:px-8">
+    <div className="attempt-enter mx-auto max-w-[1800px] px-4 py-6 font-ui sm:px-6 lg:px-8">
       <header>
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#929887]">
           <Link href="/native" className="inline-flex items-center gap-1.5 transition hover:text-[#e8b33d]"><ArrowLeft size={14} /> All attempts</Link>
