@@ -26,7 +26,7 @@ import { snapshotHash, solutionHash } from "@/lib/native/workspace";
 import { storeDelete, storeGet, storeList, storeSet } from "@/lib/native/store";
 import type { BrowserCommand } from "@/lib/native/protocol";
 import { newId } from "@/lib/native/secret";
-import { stageContext as contextPayload, starterFor } from "@/lib/native/context";
+import { connectorContext as contextPayload, starterFor } from "@/lib/native/context";
 import { isDeviceOnline } from "@/lib/native/devices";
 import { withNativeLock } from "@/lib/native/lock";
 import type { DeviceRecord } from "@/lib/native/protocol";
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       attempt.title = scenario.title;
       await saveAttempt(attempt);
       await enqueueCommand(attempt.id, device.deviceId, "session.start", {
-        context: contextPayload(scenario, seed, 1, language as Language),
+        context: contextPayload(scenario, 1, language as Language),
         adapter, model: attempt.model,
       });
       await recordServerEvent(attempt.id, device.deviceId, null, null, "context.delivered", { stage: 1 });
@@ -160,7 +160,7 @@ export async function POST(req: Request) {
       await saveAttempt(attempt);
       await enqueueCommand(attempt.id, attempt.deviceId, "session.start", {
         adapter, model: attempt.model,
-        context: contextPayload(scenario, attempt.seed, attempt.stage, attempt.language),
+        context: contextPayload(scenario, attempt.stage, attempt.language),
       });
       return NextResponse.json({ ok: true, attempt });
     }
@@ -232,7 +232,7 @@ export async function POST(req: Request) {
       // the connector applies it (or reports a conflict) before the agent reads.
       const payload: Record<string, unknown> = {
         text, turnId, stage: attempt.stage, adapter: attempt.adapter, model: attempt.model || null,
-        context: contextPayload(scenario, attempt.seed, attempt.stage, attempt.language),
+        context: contextPayload(scenario, attempt.stage, attempt.language),
       };
       if (typeof body.code === "string" && body.code.length > 0 && body.code.length <= 60000) {
         payload.pendingEdit = { code: body.code, baseRev: typeof body.baseRev === "number" ? body.baseRev : -1 };
@@ -371,7 +371,7 @@ export async function POST(req: Request) {
         attempt.id,
         attempt.deviceId,
         "context.sync",
-        { context: contextPayload(scenario, attempt.seed, attempt.stage, attempt.language as Language) },
+        { context: contextPayload(scenario, attempt.stage, attempt.language as Language) },
         `ctx-${attempt.id}-${attempt.stage}`
       );
       await recordServerEvent(attempt.id, attempt.deviceId, attempt.nativeSessionId, null, "context.delivered", {

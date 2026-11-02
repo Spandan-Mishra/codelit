@@ -15,7 +15,13 @@ export function buildCodingPrompt(context, request, contexts = [context]) {
     "Do not answer with code only in chat: chat text is not submitted. Preserve the required function interface and earlier stage behavior. Do not edit meta.json or TASK.md. Run available visible checks when useful. Finish with a short summary after saving the file.",
     `Language: ${context.language}. Required function: ${context.fnName || "use the solution stub"}. Current stage: ${context.stage}.`,
     "Released challenge context:",
-    ...contexts.map((c) => `# ${c.title || "Challenge"} — stage ${c.stage}\n${c.brief || ""}\nVisible tests:\n${JSON.stringify(c.visibleTests || [])}`),
+    ...contexts.map((c) => {
+      const tests = JSON.stringify(c.visibleTests || []);
+      const driver = c.brief
+        ? `${c.brief}\nVisible tests:\n${tests}`
+        : "No challenge brief is shared with the agent. The user's request below is the specification: follow it, and ask the user for clarification when it is ambiguous.";
+      return `# ${c.title || "Challenge"} — stage ${c.stage}\n${driver}`;
+    }),
     "User request:", String(request || ""),
   ].join("\n\n");
 }

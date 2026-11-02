@@ -74,7 +74,10 @@ export async function initAttempt(dir, context) {
     return null;
   });
   if (existing === null) await atomicWrite(sol, context.stub || "");
-  await atomicWrite(await safeJoin(dir, "TASK.md"), `# ${context.title} (stage ${context.stage})\n\n${context.brief}\n`);
+  // The server shares file-only context: no brief means the user explains
+  // the requirements in their prompts, so the task file says so explicitly.
+  const brief = context.brief || "No challenge brief is shared with this workspace. Ask your user to explain the requirements, then implement them in the solution file.";
+  await atomicWrite(await safeJoin(dir, "TASK.md"), `# ${context.title} (stage ${context.stage})\n\n${brief}\n`);
   const next = { rev: 0, language: context.language, hash: hashOf(existing ?? context.stub ?? ""), inFlight: null };
   await writeMeta(dir, next);
   return { rev: 0 };

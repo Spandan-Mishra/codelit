@@ -18,6 +18,20 @@ export function stageContext(scenario: Scenario, seed: number, stage: number, la
   };
 }
 
+// What crosses to the connector (and therefore to the user's agent).
+// Deliberately file-only: the title, the function interface, and the stub.
+// The brief and visible examples stay server/browser-side so the user must
+// explain the task in their own prompts — forwarding the full spec would let
+// the agent solve without the user ever understanding it. Server-run checks
+// remain the authoritative verdict; connector-local checks have no examples.
+export function connectorContext(scenario: Scenario, stage: number, language: string) {
+  return {
+    title: scenario.title, stage,
+    fnName: scenario.fnName, language,
+    stub: starterFor(scenario, language),
+  };
+}
+
 export function publicScenario(scenario: Scenario, attempt: NativeAttempt) {
   return {
     id: scenario.id, title: scenario.title, difficulty: scenario.difficulty,
