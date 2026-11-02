@@ -82,27 +82,27 @@ export function fallbackQuestion(
   const f = analyzeCode(code, fnName);
   const seed = (code.length + round * 17 + history.length * 7) % 3;
   if (lens === "code") {
-    const line = (f.condLine || f.loopLine).slice(0, 70);
+    const line = (f.condLine || f.loopLine).slice(0, 80);
     const variants = [
-      `From your own solution, quote what this line does on the smallest non-trivial input, step by step: \`${line}\`. You have 90 seconds; a generic answer will not match your line.`,
-      `Live mutation: I flip the comparison/boundary by one in your line \`${line}\`. Name the smallest input that now fails and trace why. You have 90 seconds; a pasted generic answer will not match your line.`,
-      `I delete one line from your solution — the one your correctness depends on most. Which line, and which test catches the deletion first?`,
+      `Explain this line from your solution, step by step, on the smallest input where it matters. Use your own variable names.\n\`\`\`\n${line}\n\`\`\`\nYou have 90 seconds.`,
+      `I change one comparison in this line from your solution:\n\`\`\`\n${line}\n\`\`\`\nName the smallest input that now gives the wrong answer, and say why. You have 90 seconds.`,
+      `If I delete one line from your solution, which line breaks it — and which example catches it first? Name the line and the input.`,
     ];
     return variants[seed];
   }
   if (lens === "design") {
     const variants = [
-      `State your time and space complexity and name the input size where your approach becomes the wrong choice. What would you switch to, and what breaks in your current code first?`,
-      `If the input were streamed and 100× larger than memory, which line of your code fails first? Sketch the change in words — no new code needed.`,
-      `Trade-off round: your solution optimizes one thing and sacrifices another. Name both, and give the constraint change that would make you rewrite it.`,
+      `What are your time and space costs in plain words (for example: "one pass, one extra table")? Name the input size where your approach stops being the right choice, and what you would switch to.`,
+      `If the input arrived as a stream 100x bigger than memory, which line of your code fails first? Describe the fix in words — no new code.`,
+      `Your solution trades one thing for another. Name what it optimizes and what it sacrifices. What change in the constraints would make you rewrite it?`,
     ];
     return variants[seed];
   }
   if (lens === "prompts") {
     if (traceSummary) {
-      return `Your trace shows ${traceSummary}. Which single prompt or decision moved your run forward the most — and what exactly did it change in the code? Quote the line. You have 90 seconds; a generic answer will not match your trace.`;
+      return `Your trace shows ${traceSummary}.\nWhich single prompt or decision moved your run forward the most? Quote the exact line it changed in your code. You have 90 seconds.`;
     }
-    return `No trace was captured for this run, so defend your process from memory: which single instruction or decision shaped your final solution most — and what exactly did it change in the code? Quote the line.`;
+    return `Which single instruction or decision shaped your final solution most? Quote the exact line it changed in your code.`;
   }
   if (round === 0) {
     // Trace-grounded defense: round 1 asks about the decision that drove the run.
@@ -183,6 +183,8 @@ export async function nextQuestion(args: {
         "." +
         lensLine +
         " Reference the candidate's actual code lines." +
+        " Write clearly and readably: short sentences, plain words, one question only." +
+        " Put any quoted code in its own fenced block, never tangled inside a sentence." +
         (args.traceSummary ? " Reference their trace (prompts, reverts, decision points)." : "") +
         " Make it personalized and timed so a generic pasted AI answer does not fit. No preamble, just the question.",
     },

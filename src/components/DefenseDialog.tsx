@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, CheckCheck, LoaderCircle, ShieldCheck, Timer, X } from "lucide-react";
+import { ArrowRight, CheckCheck, LoaderCircle, ShieldCheck, Timer } from "lucide-react";
 import { finalScore } from "@/lib/judge";
+import SessionMarkdown from "./SessionMarkdown";
 
 const DEFEND_SECONDS = 90;
 const LENSES = ["code", "design", "prompts"] as const;
@@ -184,6 +185,17 @@ export default function DefenseDialog(props: DefenseDialogProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verdict]);
 
+  // The page behind the dialog must not scroll: lock body scroll while
+  // the defense is up, and always restore it on close or unmount.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open ]);
+
   if (!open) return null;
 
   const step = verdict ? LENSES.length + 1 : started ? round + 1 : 0;
@@ -195,12 +207,11 @@ export default function DefenseDialog(props: DefenseDialogProps) {
   const offline = turns.some((t) => t.engine === "offline");
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Solution defense" className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 font-ui">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[#3a3d33] bg-[#141613]">
+    <div role="dialog" aria-modal="true" aria-label="Solution defense" className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 p-4 font-ui backdrop-blur-sm">
+      <div className="my-auto max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[#3a3d33] bg-[#141613] shadow-2xl shadow-black/60">
         <div className="border-b border-[#2c3026] px-5 pb-4 pt-5">
           <div className="flex items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-sm font-semibold text-[#e8eadf]"><ShieldCheck size={16} className="text-[#e8b33d]" /> Defend your solution</p>
-            <button onClick={onClose} aria-label="Close defense" className="rounded-md p-1 text-[#8f9980] transition hover:bg-white/5 hover:text-[#e8eadf]"><X size={16} /></button>
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded bg-white/10" role="progressbar" aria-valuenow={step} aria-valuemin={0} aria-valuemax={LENSES.length + 1} aria-label={stepLabel}>
             <div className="h-full bg-[#e8b33d] transition-all" style={{ width: `${(step / (LENSES.length + 1)) * 100}%` }} />
@@ -214,7 +225,7 @@ export default function DefenseDialog(props: DefenseDialogProps) {
           {!started && !verdict && (
             <div>
               <p className="text-sm leading-7 text-[#c9cec0]">Three timed questions about <span className="font-semibold text-[#e8eadf]">your</span> solution — a code excerpt, a design choice, and the prompts behind it. You get {DEFEND_SECONDS} seconds per question; the clock auto-submits at zero.</p>
-              <p className="mt-2 text-xs leading-6 text-[#929b83]">Your defense banks the final score and lands on your passport. Closing this dialog keeps your finished attempt — you can defend later.</p>
+              <p className="mt-2 text-xs leading-6 text-[#929b83]">Your defense banks the final score and lands on your passport. Answer all three questions to finish — the dialog stays until your verdict.</p>
               <button disabled={loading} onClick={() => { setStarted(true); void fetchQuestion(0, []); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#e8b33d] px-5 py-2.5 text-xs font-semibold text-[#17190e] transition hover:bg-[#f0c15d] disabled:cursor-not-allowed disabled:opacity-40">
                 {loading ? <><LoaderCircle size={14} className="animate-spin" /> Preparing…</> : <>Start defense <ArrowRight size={13} /></>}
               </button>
@@ -229,7 +240,7 @@ export default function DefenseDialog(props: DefenseDialogProps) {
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-[#e8b33d]"><Timer size={13} /> {secondsLeft}s left{secondsLeft === 0 ? " — submitting…" : ""}</p>
               <div className="mt-1 h-1 overflow-hidden rounded bg-white/10"><div className="h-full bg-[#e8b33d] transition-all" style={{ width: `${(secondsLeft / DEFEND_SECONDS) * 100}%` }} /></div>
-              <p className="mt-4 text-sm font-medium leading-7 text-[#e8eadf]">{question}</p>
+              <div className="mt-4 rounded-lg border border-[#30342a] bg-[#0d100b] p-4"><SessionMarkdown text={question} /></div>
               <label htmlFor="defense-answer" className="mb-1 mt-4 block text-xs font-semibold text-[#d7ddcb]">Your answer</label>
               <textarea
                 id="defense-answer"
