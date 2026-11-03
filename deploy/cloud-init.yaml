@@ -1,0 +1,11 @@
+#cloud-config
+# Optional: paste this as "User data" when creating the Oracle instance.
+# It clones the public repo and runs deploy/setup-vm.sh, so the app is up
+# on http://<public-ip>:3000 a few minutes after first boot.
+# It contains NO secrets. Add /opt/codelit/.env.local over SSH afterwards,
+# then: sudo systemctl restart codelit
+package_update: false
+runcmd:
+  - apt-get update && apt-get install -y git
+  - git clone https://github.com/Spandan-Mishra/codelit.git /opt/codelit-src
+  - bash /opt/codelit-src/deploy/setup-vm.sh

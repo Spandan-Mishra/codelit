@@ -47,34 +47,54 @@ Free *container* hosts need no card, but the canary decides. In order:
 3. If both fail the canary (likely), go straight to Plan C — do not burn
    deadline hours on container hosts.
 
-## Plan B — friend's card: Oracle Cloud Always Free VM (best "real" deploy)
+## Plan B — Oracle Cloud Always Free VM (chosen; steps in chat + below)
 
-Oracle's Always Free tier never expires and the Ampere A1 shape
-(4 cores / 24 GB) is far more than this app needs. A card is required
-only for identity verification; nothing is charged on Always Free shapes.
-Your friend's card on *your* Oracle account, or their account with you
-added — either works; remove the card after verification if Oracle allows
-in your region.
+Never click **Upgrade to Pay As You Go**. Create only resources labelled
+**Always Free-eligible**:
 
-1. Create the VM: Ubuntu 24.04, Ampere A1 (Always Free), open ports
-   22/80/443 in the security list. (Avoid Google Cloud's free e2-micro:
-   1 GB RAM risks OOM during `next build`.)
-2. On the VM:
+1. Sign up at `oracle.com/cloud/free` → **Start for free**. Pick the home
+   region closest to you — it cannot be changed later. Card is a
+   verification hold only; Always Free shapes are never billed. The
+   30-day $300 trial expiring does **not** kill Always Free resources.
+2. Console → Compute → Instances → Create instance:
+   - Name: `codelit`
+   - Image: **Canonical Ubuntu 24.04**
+   - Shape: change → Ampere → **VM.Standard.A1.Flex**, 2 OCPU / 12 GB
+     (Always Free allows 4 OCPU / 24 GB total; 2/12 leaves headroom and
+     hits fewer "out of capacity" errors — retry other availability
+     domains if you get one)
+   - Networking: new public subnet, **assign public IPv4**
+   - SSH: paste/upload your public key (or download the generated pair
+     and keep the private key safe)
+   - Advanced → Management → User data: paste
+     [deploy/cloud-init.yaml](deploy/cloud-init.yaml)
+3. Networking → Virtual Cloud Networks → your VCN → Security Lists →
+   default: add ingress rules for TCP **80, 443, 3000** from
+   `0.0.0.0/0` (22 is already there). `setup-vm.sh` also opens the host
+   iptables rules Oracle's Ubuntu image ships closed — both layers are
+   required.
+4. If you did not use cloud-init, SSH in and run:
    ```bash
-   git clone https://github.com/Spandan-Mishra/codelit.git && cd codelit
-   sudo bash deploy/setup-vm.sh
+   git clone https://github.com/Spandan-Mishra/codelit.git /tmp/codelit-src
+   sudo bash /tmp/codelit-src/deploy/setup-vm.sh
    ```
-   It installs Node 22 + bubblewrap/python3/g++, builds, and starts the
-   [systemd unit](deploy/codelit.service) as the non-root `codelit` user.
-3. Secrets on the VM only (never commit): create `/opt/codelit/.env.local`
-   from [.env.example](.env.example) with `MODEL_API_KEY` (Meta API — live
-   interrogation; the app also works offline without it) and a fresh
-   `NATIVE_SESSION_SECRET` (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).
-4. HTTPS: point a free DuckDNS subdomain at the VM IP, put it in
-   [deploy/Caddyfile](deploy/Caddyfile), install Caddy. No domain? Judges
-   can use `http://<vm-ip>:3000` for the demo window.
-5. Run the canary against the public URL, then one full Practice →
-   Defend flow in the browser before recording.
+   It installs Node 22 + bubblewrap/python3/g++/Caddy, builds, and starts
+   the [systemd unit](deploy/codelit.service) as the non-root `codelit`
+   user, then runs the canary.
+5. Secrets on the VM only (never commit), then restart:
+   ```bash
+   sudo nano /opt/codelit/.env.local   # MODEL_API_KEY, NATIVE_SESSION_SECRET
+   sudo systemctl restart codelit
+   ```
+   Fresh secret: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+6. No-cost guardrails: Billing → Budgets → create a budget with an alert
+   at ₹1/$1 actual spend. Only ever pick shapes/boot volumes marked
+   Always Free-eligible (total boot volumes ≤ 200 GB). Delete anything
+   you create that lacks that label.
+7. Run the canary against `http://<public-ip>:3000`, then one full
+   Practice → Defend flow in the browser before recording. HTTPS:
+   point a free DuckDNS subdomain at the IP and re-run
+   `sudo bash deploy/setup-vm.sh your.domain` on the VM.
 
 ## Plan C — alternative if A and B both fail: your own machine + tunnel
 
