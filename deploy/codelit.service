@@ -12,9 +12,10 @@ ExecStart=/usr/bin/npm run start -- -p 3000
 Restart=on-failure
 RestartSec=3
 # The runner spawns bubblewrap children; do not add PrivateUsers=,
-# ProtectSystem=strict, or NoNewPrivileges=true here — unprivileged user
-# namespaces are the isolation mechanism and those directives break it.
-ReadWritePaths=/opt/codelit/data /opt/codelit/.codelit-runtime
+# ProtectSystem=strict, NoNewPrivileges=true, or ReadWritePaths here —
+# unprivileged user namespaces are the isolation mechanism and those
+# directives break it (ReadWritePaths also fails mount setup when the
+# path does not exist yet).
 
 [Install]
 WantedBy=multi-user.target

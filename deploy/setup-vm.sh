@@ -56,6 +56,7 @@ if [[ ! -f "$APP_DIR/.env.local" ]]; then
   echo "   MODEL_API_KEY, META_MODEL_INTERROGATE, META_API_BASE, NATIVE_SESSION_SECRET"
 fi
 
+sudo -u codelit mkdir -p "$APP_DIR/data/native" "$APP_DIR/.codelit-runtime"
 sudo -u codelit bash -c "cd $APP_DIR && npm ci && npm run build"
 
 install -m 0644 "$APP_DIR/deploy/codelit.service" /etc/systemd/system/codelit.service
