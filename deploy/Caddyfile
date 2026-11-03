@@ -1,0 +1,6 @@
+# Replace with your domain (free option: a DuckDNS subdomain pointed at the
+# VM's public IP). Caddy then provisions HTTPS automatically.
+# No domain? Delete this file and use http://<vm-public-ip>:3000 instead.
+codelit.example.com {
+	reverse_proxy 127.0.0.1:3000
+}

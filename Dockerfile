@@ -6,11 +6,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-RUN npm run build && mkdir -p /app/data && chown node:node /app/data
+RUN npm run build && mkdir -p /app/data/native /app/.codelit-runtime \
+    && chown -R node:node /app/data /app/.codelit-runtime
 # Root bypasses RLIMIT_NPROC; the runner deliberately rejects root execution.
 USER node
 ENV PORT=3000
 EXPOSE 3000
 # Requires working nested unprivileged namespaces. Do not mount the Docker socket
 # or add --privileged to work around blocked namespaces; execution fails closed.
-CMD ["npm", "run", "start", "--", "-p", "3000"]
+# Shell form so hosts that inject $PORT (Render, HF Spaces, Fly) are honored;
+# defaults to 3000 locally.
+CMD ["sh", "-c", "npm run start -- -p ${PORT:-3000}"]
