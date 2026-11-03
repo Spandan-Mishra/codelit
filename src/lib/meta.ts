@@ -10,7 +10,9 @@ export function hasMetaKey() {
 export const INTERROGATE_MODEL =
   process.env.META_MODEL_INTERROGATE || process.env.META_MODEL || "muse-spark-1.3-contributor";
 
-async function callMeta(messages: { role: string; content: string }[], maxTokens = 400, model = INTERROGATE_MODEL) {
+// The contributor model spends ~200 tokens reasoning before answering, so a
+// 400-token cap returns empty content and silently degrades to offline.
+async function callMeta(messages: { role: string; content: string }[], maxTokens = 2000, model = INTERROGATE_MODEL) {
   const key = process.env.MODEL_API_KEY;
   if (!key) return null;
   const base = process.env.META_API_BASE || "https://api.meta.ai/v1";
