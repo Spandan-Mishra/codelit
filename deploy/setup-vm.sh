@@ -31,9 +31,12 @@ if ! command -v caddy >/dev/null; then
 fi
 
 # Unprivileged user namespaces (required by bubblewrap; persist across reboot)
+# Ubuntu 24.04 also restricts them via AppArmor — without the third line
+# bwrap fails with "setting up uid map: Permission denied".
 sysctl -w kernel.unprivileged_userns_clone=1 || true
 sysctl -w user.max_user_namespaces=28633 || true
-printf 'kernel.unprivileged_userns_clone=1\nuser.max_user_namespaces=28633\n' \
+sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+printf 'kernel.unprivileged_userns_clone=1\nuser.max_user_namespaces=28633\nkernel.apparmor_restrict_unprivileged_userns=0\n' \
   > /etc/sysctl.d/99-codelit.conf
 
 # Tiny free shapes (1 GB RAM) OOM during `next build` without swap.
