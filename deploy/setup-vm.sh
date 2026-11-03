@@ -36,6 +36,12 @@ sysctl -w user.max_user_namespaces=28633 || true
 printf 'kernel.unprivileged_userns_clone=1\nuser.max_user_namespaces=28633\n' \
   > /etc/sysctl.d/99-codelit.conf
 
+# Tiny free shapes (1 GB RAM) OOM during `next build` without swap.
+if [[ -z "$(swapon --show)" ]] && awk '/MemTotal/{exit !($2 < 3145728)}' /proc/meminfo; then
+  fallocate -l 4G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 id codelit >/dev/null 2>&1 || useradd --create-home --shell /bin/bash codelit
 
 # Clone or update (create the dir as root first, then hand it to codelit)
