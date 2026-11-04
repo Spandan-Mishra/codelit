@@ -79,11 +79,10 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST"
 
       - name: External health check
-        env:
-          DEPLOY_HOST: ${{ secrets.ORACLE_HOST }}
         run: |
+          # Port 3000 is not public; Caddy on 443 is the only ingress.
           for i in $(seq 1 30); do
-            if curl -fsS --max-time 15 "http://$DEPLOY_HOST:3000/api/health"; then
+            if curl -fsS --max-time 15 "https://codelit.duckdns.org/api/health"; then
               exit 0
             fi
             sleep 10
