@@ -14,11 +14,18 @@ HEALTH_URL="${CODELIT_HEALTH_URL:-http://127.0.0.1:3000/api/health}"
 log() { printf '[codelit-deploy %s] %s\n' "$(date -u +%FT%TZ)" "$*"; }
 as_app() { sudo -u codelit -- "$@"; }
 
+log "waiting for deploy lock"
 exec 9>"/run/${SERVICE}-deploy.lock"
-if ! flock -w 1800 9; then
-  log "another deploy is still running; giving up"
-  exit 75
+if ! flock -n 9; then
+  # A concurrent deploy (manual or a previous Actions run) holds the lock.
+  # Wait for it rather than racing the build; the workflow keeps this SSH
+  # session alive with ServerAliveInterval while we block.
+  if ! flock -w 1800 9; then
+    log "another deploy is still running; giving up"
+    exit 75
+  fi
 fi
+log "deploy lock acquired"
 
 cd "$APP_DIR"
 
