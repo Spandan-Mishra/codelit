@@ -70,8 +70,10 @@ systemctl restart codelit
 # Oracle Cloud Ubuntu images ship a host iptables REJECT rule: opening a
 # port in the Security List alone is not enough. Open it here too.
 for port in 22 80 443 3000; do
+  # Oracle's REJECT rule sits at line 5; inserting at 6 lands below it and
+  # never matches. Always insert above it.
   iptables -C INPUT -m state --state NEW -p tcp --dport "$port" -j ACCEPT 2>/dev/null \
-    || iptables -I INPUT 6 -m state --state NEW -p tcp --dport "$port" -j ACCEPT
+    || iptables -I INPUT 5 -m state --state NEW -p tcp --dport "$port" -j ACCEPT
 done
 if command -v netfilter-persistent >/dev/null; then
   netfilter-persistent save || true
