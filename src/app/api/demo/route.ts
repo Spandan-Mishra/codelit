@@ -20,7 +20,9 @@ export function GET(req: Request) {
   if (!sessionId) return NextResponse.json({ error: "Invalid or expired demo link." }, { status: 400 });
   const to = url.searchParams.get("to") || "/native";
   const target = TARGETS.has(to) ? to : "/native";
-  const res = NextResponse.redirect(new URL(target, url.origin), 302);
+  // Relative Location: the app is served on a bare IP:port internally, so
+  // req.url's origin can be localhost — never leak that to the browser.
+  const res = new NextResponse(null, { status: 302, headers: { Location: target } });
   res.headers.append(
     "Set-Cookie",
     `${NATIVE_SESSION_COOKIE}=${encodeURIComponent(sid)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`
