@@ -24,7 +24,13 @@ async function callMeta(messages: { role: string; content: string }[], maxTokens
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return (data.choices?.[0]?.message?.content as string) || null;
+    const content = (data.choices?.[0]?.message?.content as string) || null;
+    if (content) return content;
+    // Long prompts can exhaust the reasoning budget and return empty
+    // content with a 200. One retry at double budget before giving up
+    // to the offline fallback.
+    if (maxTokens < 8000) return callMeta(messages, Math.min(maxTokens * 2, 8000), model);
+    return null;
   } catch {
     return null;
   }

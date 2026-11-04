@@ -86,7 +86,9 @@ async function baseArgs(dir: string): Promise<string[]> {
     "--setenv", "PATH", "/usr/bin:/bin", "--setenv", "HOME", "/tmp", "--setenv", "LANG", "C.UTF-8",
   ];
   // Deliberately omit /usr/local, /etc, /home, app files, host /tmp, sockets and credentials.
-  for (const p of ["/usr/bin", "/usr/lib", "/usr/include", "/usr/lib64"]) {
+  // /usr/libexec matters: Ubuntu puts g++'s cc1plus there, Debian/others
+  // under /usr/lib — bind whichever exist or C++ probes fail as unavailable.
+  for (const p of ["/usr/bin", "/usr/lib", "/usr/include", "/usr/lib64", "/usr/libexec"]) {
     try { await access(p); args.push("--ro-bind", p, p); } catch { /* optional system directory */ }
   }
   for (const p of ["/bin", "/lib", "/lib64"]) {
