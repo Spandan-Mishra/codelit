@@ -2,21 +2,21 @@
 // codelit-connect: pair this machine, then run the relay loop.
 //   pair --relay <https://codelit-host> --code <CODE> [--label NAME] [--yes]
 //   run  --relay <https://codelit-host>
-//   status | probe-codex
-// Auth model: your agent login stays in your own tools (~/.codex, claude
-// login). Codelit gets a revocable device token only — never your tokens.
+//   status | probe-codex | probe-muse | login --provider <codex|muse>
+// Auth model: your agent login stays in your own tools (codex login,
+// muse login). Codelit gets a revocable device token only — never tokens.
 
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import readline from "node:readline";
 import * as codex from "../lib/codex.mjs";
-import * as claude from "../lib/claude.mjs";
+import * as muse from "../lib/muse.mjs";
 import { claimPairingCode, createRelayClient, loadCred, saveCred } from "../lib/relay.mjs";
 import { configDir } from "../lib/config.mjs";
 import { createAttemptRuntime } from "../lib/runtime.mjs";
 
-const ADAPTERS = { codex, claude };
+const ADAPTERS = { codex, muse };
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -69,6 +69,27 @@ async function cmdProbeCodex() {
   const r = await codex.probe();
   console.log(JSON.stringify(r, null, 2));
   process.exit(r.ok ? 0 : 1);
+}
+
+async function cmdProbeMuse() {
+  const r = await muse.probe();
+  console.log(JSON.stringify(r, null, 2));
+  process.exit(r.ok ? 0 : 1);
+}
+
+async function cmdLogin() {
+  const { spawnSync } = await import("node:child_process");
+  const provider = (arg("--provider") || "").toLowerCase();
+  if (provider !== "codex" && provider !== "muse") {
+    console.error("usage: codelit-connect login --provider <codex|muse>");
+    process.exit(2);
+  }
+  // Login stays inside your own agent CLI — Codelit never sees the tokens.
+  console.log(provider === "muse"
+    ? "Opening Muse login in your browser…"
+    : "Opening Codex login…");
+  const r = spawnSync(provider, ["login"], { stdio: "inherit" });
+  process.exit(r.status ?? 1);
 }
 
 async function cmdPair() {
@@ -162,7 +183,9 @@ if (cmd === "pair") await cmdPair();
 else if (cmd === "run") await cmdRun();
 else if (cmd === "status") await cmdStatus();
 else if (cmd === "probe-codex") await cmdProbeCodex();
+else if (cmd === "probe-muse") await cmdProbeMuse();
+else if (cmd === "login") await cmdLogin();
 else {
-  console.error("usage: codelit-connect <pair|run|status|probe-codex> [options]");
+  console.error("usage: codelit-connect <pair|run|status|probe-codex|probe-muse|login> [options]");
   process.exit(2);
 }

@@ -2,7 +2,7 @@
 // normalized Codelit events. Protocol pinned against codex app-server
 // generate-ts output (tested: 0.164.0 — rerun probe after CLI upgrades).
 //
-// Adapter contract (same shape as claude.mjs):
+// Adapter contract (same shape as muse.mjs):
 //   detect(), capabilities(), probe(), start(), turn(), interrupt(),
 //   resume(), decideApproval(), state(), close(), onEvent()
 // Auth stays inside Codex (managed ChatGPT/API key login on this machine).

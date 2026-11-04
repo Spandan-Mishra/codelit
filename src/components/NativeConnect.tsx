@@ -52,7 +52,7 @@ export function adapterIsReady(adapter: ReportedAdapter): boolean {
 }
 
 export function adapterLabel(adapter: NativeAdapterId): string {
-  return adapter === "codex" ? "Codex" : "Claude Code";
+  return adapter === "codex" ? "Codex" : "Muse Code";
 }
 
 export function useNativeDevices() {
@@ -113,12 +113,12 @@ function ProviderCard({ adapterId, devices, now }: { adapterId: NativeAdapterId;
   return (
     <div className={`rounded-xl border p-4 ${available ? "border-emerald-400/25 bg-emerald-400/[0.03]" : "border-[#30322c] bg-black/15"}`}>
       <div className="flex items-center gap-3">
-        <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#3a3c37] font-code text-sm">{adapterId === "codex" ? ">_" : "✳"}</span>
+        <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#3a3c37] font-code text-sm">{adapterId === "codex" ? ">_" : "✦"}</span>
         <h3 className="flex-1 font-semibold">{adapterLabel(adapterId)}</h3>
         <span className={`inline-flex items-center gap-1.5 text-xs ${available ? "text-emerald-300" : "text-[#b3afa3]"}`}><Circle className={`h-2 w-2 ${available ? "fill-current" : ""}`} />{available ? "Available" : reports.length ? "Needs attention" : "Not connected"}</span>
       </div>
       {reports.length === 0 ? (
-        <p className="mt-4 text-xs leading-6 text-[#b3afa3]">{adapterId === "codex" ? "Connect your computer to check installation, local authentication, and available models." : "CLI detection is available. Claude solving is not supported by this connector yet."}</p>
+        <p className="mt-4 text-xs leading-6 text-[#b3afa3]">Connect your computer to check installation, local authentication, and available models.</p>
       ) : reports.map(({ device, adapter }) => {
         const online = deviceIsOnline(device, now);
         const state = deviceState(device, now);
@@ -242,7 +242,7 @@ export default function NativeConnect({ continueHref = "/native", inline = false
       <p className="mt-3 max-w-3xl text-sm leading-6 text-[#b3afa3]">Your browser cannot launch local programs or read your agent login. The connector runs on your computer and bridges Codelit to your installed agent. Your provider credentials stay local; challenge messages, tool activity, and solution files are sent to Codelit.</p>
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         <ProviderCard adapterId="codex" devices={live} now={now} />
-        <ProviderCard adapterId="claude" devices={live} now={now} />
+        <ProviderCard adapterId="muse" devices={live} now={now} />
       </div>
       <p className="mt-3 text-xs leading-5 text-[#9a968c]">Status is reported by your connector. “Preflight ready” checks local authentication and model discovery; it does not guarantee a successful agent turn.</p>
 

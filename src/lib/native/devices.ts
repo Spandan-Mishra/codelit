@@ -8,7 +8,7 @@ export function cleanAdapters(value: unknown): AdapterCapabilities[] {
   return value.slice(0, 4).flatMap((raw) => {
     if (!raw || typeof raw !== "object") return [];
     const o = raw as Record<string, unknown>;
-    if ((o.adapter !== "codex" && o.adapter !== "claude") || seen.has(o.adapter)) return [];
+    if ((o.adapter !== "codex" && o.adapter !== "muse") || seen.has(o.adapter)) return [];
     seen.add(o.adapter);
     const statuses = ["ready", "missing", "unauthenticated", "unsupported", "error"] as const;
     const status = statuses.find((s) => s === o.status);

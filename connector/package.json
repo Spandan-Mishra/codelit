@@ -1,7 +1,7 @@
 {
   "name": "codelit-connect",
   "version": "0.2.0",
-  "description": "Local connector: runs your own coding agent (Codex, then Claude) for Codelit attempts. No dependencies, Node 22+.",
+  "description": "Local connector: runs your own coding agent (Codex or Muse Code) for Codelit attempts. No dependencies, Node 22+.",
   "type": "module",
   "bin": {
     "codelit-connect": "./bin/codelit-connect.mjs"

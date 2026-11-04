@@ -71,7 +71,7 @@ export default function NativeSetupGuide({
       {step === "install" && (
         <details className="mt-4 text-xs text-[#b3afa3]">
           <summary className="cursor-pointer text-[#ece9e2]">Need the agent or Node.js first?</summary>
-          <p className="mt-2">Install <a href="https://nodejs.org/en/download" target="_blank" rel="noreferrer" className="text-[#e8b33d] underline underline-offset-4">Node.js 22 or newer</a>, then install and sign into your coding agent on this computer. For Codex, run <code className="font-code">codex login</code>. A Claude CLI installation is detected, but this connector does not yet support Claude solving.</p>
+          <p className="mt-2">Install <a href="https://nodejs.org/en/download" target="_blank" rel="noreferrer" className="text-[#e8b33d] underline underline-offset-4">Node.js 22 or newer</a>, then install and sign into your coding agent on this computer. For Codex, run <code className="font-code">codex login</code>. For Muse Code, run <code className="font-code">codelit-connect login --provider muse</code> (it opens <code className="font-code">muse login</code> for you) — or set <code className="font-code">META_API_KEY</code>. Codelit never sees your tokens; sign-in stays inside your own agent.</p>
           <p className="mt-2">No project checkout is required. Already have the connector? Skip this step below.</p>
         </details>
       )}

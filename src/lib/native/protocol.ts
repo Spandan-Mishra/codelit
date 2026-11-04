@@ -8,7 +8,7 @@ export const NATIVE_PROTOCOL_VERSION = 1;
 /** Where an event was established. Connector reports are evidence, never proof. */
 export type Provenance = "codelit" | "connector" | "imported";
 
-export type NativeAdapterId = "codex" | "claude";
+export type NativeAdapterId = "codex" | "muse";
 
 export type AdapterStatus = "ready" | "missing" | "unauthenticated" | "unsupported" | "error";
 export interface NativeModel { id: string; label: string }
@@ -251,7 +251,7 @@ export function sanitizeConnectorEvent(v: unknown): { ok: boolean; error?: strin
       source: "connector",
       sourceSeq: o.sourceSeq as number,
       sourceTime: o.sourceTime as number,
-      adapter: o.adapter === "codex" || o.adapter === "claude" ? o.adapter : null,
+      adapter: o.adapter === "codex" || o.adapter === "muse" ? o.adapter : null,
       model: typeof o.model === "string" ? (o.model as string).slice(0, 120) : null,
       payload,
     },
