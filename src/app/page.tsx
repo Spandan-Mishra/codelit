@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ALL_SCENARIOS } from "@/lib/scenarios";
 import AgentCta from "@/components/AgentCta";
 import { Timer, MessageSquareWarning, Fingerprint, Trophy, Bot } from "lucide-react";
 
@@ -16,7 +15,7 @@ export default function Home() {
           </p>
           <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row sm:flex-wrap gap-2.5 sm:gap-3 font-ui">
             <Link href="/scenarios" className="text-center px-5 py-2.5 rounded-md bg-[#e8b33d] text-black font-semibold text-sm hover:bg-[#f2c14e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Run a scenario</Link>
-            <Link href="/duels" className="text-center px-5 py-2.5 rounded-md border border-[#3a3c37] text-sm hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Race the house pace</Link>
+            <Link href="/agents" className="text-center px-5 py-2.5 rounded-md border border-[#3a3c37] text-sm hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Connect your agent</Link>
           </div>
           <div className="mt-6 sm:mt-8 grid gap-2.5 sm:grid-cols-3 sm:gap-3 font-ui text-sm">
             <div className="rounded-lg border border-[#262824] bg-[#141613] p-4"><Timer className="h-5 w-5 text-[#e8b33d]" /><p className="mt-2 font-semibold">Timed runs</p><p className="text-[#9a968c] text-[13px] mt-1 leading-5">Prompt budgets and clocks beat copy-paste.</p></div>
@@ -27,10 +26,11 @@ export default function Home() {
         <div className="rounded-lg border border-[#262824] bg-[#141613] p-5 font-ui lg:sticky lg:top-20">
           <p className="text-xs tracking-[0.18em] text-[#9a968c]">HOW IT WORKS</p>
           <ol className="mt-4 space-y-4 text-sm">
-            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">01</span><div><p className="font-semibold">Practice with your agent</p><p className="text-[#9a968c] text-[13px]">Requirements arrive in stages. Prompts are captured for you.</p></div></li>
-            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">02</span><div><p className="font-semibold">Unlock Ranked</p><p className="text-[#9a968c] text-[13px]">Pass 5 practice scenarios to enter counted runs.</p></div></li>
-            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">03</span><div><p className="font-semibold">Defend the trace</p><p className="text-[#9a968c] text-[13px]">Timed questions on your code, choices, and prompts.</p></div></li>
-            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">04</span><div><p className="font-semibold">Bank your passport</p><p className="text-[#9a968c] text-[13px]">Defended scores land on your passport as proof.</p></div></li>
+            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">01</span><div><p className="font-semibold">Connect your agent</p><p className="text-[#9a968c] text-[13px]">Pair your computer once. Codex or Muse Code, signed in on your machine — your login never leaves it.</p></div></li>
+            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">02</span><div><p className="font-semibold">Practice</p><p className="text-[#9a968c] text-[13px]">Repeatable, unscored. Requirements arrive in stages; every prompt is captured for you.</p></div></li>
+            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">03</span><div><p className="font-semibold">Unlock Ranked</p><p className="text-[#9a968c] text-[13px]">Pass 5 practice scenarios to enter counted runs.</p></div></li>
+            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">04</span><div><p className="font-semibold">Defend the trace</p><p className="text-[#9a968c] text-[13px]">Timed questions on your code, choices, and prompts.</p></div></li>
+            <li className="flex gap-3"><span className="font-code text-[#e8b33d]">05</span><div><p className="font-semibold">Bank your passport</p><p className="text-[#9a968c] text-[13px]">Defended scores land on your passport as proof.</p></div></li>
           </ol>
         </div>
       </section>
@@ -42,29 +42,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="pb-6 pt-6">
-        <div className="flex items-end justify-between gap-4">
-          <h2 className="text-xl sm:text-2xl tracking-tight">Agent scenarios</h2>
-          <Link href="/scenarios" className="shrink-0 font-ui text-sm text-[#e8b33d] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d] rounded">All scenarios →</Link>
-        </div>
-        <div className="mt-4 grid gap-3">
-          {ALL_SCENARIOS.map((s) => (
-            <div key={s.id} className="flex flex-wrap items-center gap-4 rounded-lg border border-[#262824] bg-[#141613] px-5 py-4">
-              <div className="min-w-0 flex-1 basis-56">
-                <h3 className="text-base sm:text-lg leading-snug">{s.title}</h3>
-                <p className="font-ui text-xs text-[#9a968c] mt-0.5">{s.difficulty} · {s.tags.join(" · ")} · {s.minutes}m</p>
-                <p className="font-ui text-xs leading-5 text-[#8a877d] mt-1 line-clamp-2">{s.blurb}</p>
-              </div>
-              <Link href="/scenarios" className="font-ui font-semibold text-sm px-4 py-2 rounded-md bg-[#e8b33d] text-black hover:bg-[#f2c14e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Run →</Link>
-            </div>
-          ))}
-        </div>
-      </section>
-
       <section className="py-8">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><h2 className="text-xl sm:text-2xl tracking-tight">Agent duels</h2><span className="font-ui text-xs text-[#9a968c]">you + your agent vs a simulated house pace · first green wins</span></div>
-        <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">Watch its progress live while you work. Beat it to earn credits toward harder difficulties.</p>
-        <Link href="/duels" className="inline-block mt-4 font-ui text-sm px-4 py-2 rounded-md border border-[#3a3c37] hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Open duels →</Link>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><h2 className="text-xl sm:text-2xl tracking-tight">Agent duels</h2><span className="font-ui text-[11px] font-semibold text-[#e8b33d] border border-[#e8b33d]/40 rounded px-1.5 py-0.5">Coming soon</span></div>
+        <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">You and your agent against a house agent on the same scenario, live progress on both sides, first fully-passing run wins. Casual races first, competitive matchmaking after.</p>
+        <Link href="/duels" className="inline-block mt-4 font-ui text-sm px-4 py-2 rounded-md border border-[#3a3c37] hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">What&apos;s planned →</Link>
       </section>
 
       <AgentCta />
