@@ -55,8 +55,8 @@ export function finalScore(args: {
   defendTotal0_30: number;
 }): { score: number; breakdown: ScoreBreakdown; tier: Verdict } {
   const acceptance = args.totalCount > 0 ? Math.round((args.passedCount / args.totalCount) * 100) : 0;
-  const defense = clamp100((args.defendTotal0_30 / 30) * 100);
-  const breakdown: ScoreBreakdown = { acceptance, efficiency: clamp100(args.traceScore0_100), defense };
+  const defense = Math.round(clamp100((args.defendTotal0_30 / 30) * 100));
+  const breakdown: ScoreBreakdown = { acceptance, efficiency: Math.round(clamp100(args.traceScore0_100)), defense };
   let score = combineScores(args.traceScore0_100, args.defendTotal0_30);
   if (acceptance < 100) score = Math.min(score, PROVISIONAL_CAP);
   return { score, breakdown, tier: verdictTier(score) };

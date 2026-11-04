@@ -12,7 +12,7 @@ export const INTERROGATE_MODEL =
 
 // The contributor model spends ~200 tokens reasoning before answering, so a
 // 400-token cap returns empty content and silently degrades to offline.
-async function callMeta(messages: { role: string; content: string }[], maxTokens = 2000, model = INTERROGATE_MODEL) {
+async function callMeta(messages: { role: string; content: string }[], maxTokens = 2000, model = INTERROGATE_MODEL, timeoutMs = 25_000) {
   const key = process.env.MODEL_API_KEY;
   if (!key) return null;
   const base = process.env.META_API_BASE || "https://api.meta.ai/v1";
@@ -20,7 +20,12 @@ async function callMeta(messages: { role: string; content: string }[], maxTokens
     const res = await fetch(`${base}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0.4 }),
+      // Short grounded Q&A/grading needs little reasoning; without this the
+      // contributor model reasons at length and a defense call takes ~1min.
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature: 0.4, reasoning_effort: "low" }),
+      // A hung model call must degrade to the offline fallback, never hang
+      // the defense dialog.
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -29,7 +34,7 @@ async function callMeta(messages: { role: string; content: string }[], maxTokens
     // Long prompts can exhaust the reasoning budget and return empty
     // content with a 200. One retry at double budget before giving up
     // to the offline fallback.
-    if (maxTokens < 8000) return callMeta(messages, Math.min(maxTokens * 2, 8000), model);
+    if (maxTokens < 8000) return callMeta(messages, Math.min(maxTokens * 2, 8000), model, timeoutMs);
     return null;
   } catch {
     return null;
@@ -203,6 +208,84 @@ export async function nextQuestion(args: {
   ]);
   if (live) return { question: live.trim(), engine: INTERROGATE_MODEL };
   return { question: fallbackQuestion(args.round, args.problemTitle, args.code, args.fnName, args.history, args.traceSummary, args.lens), engine: "offline" };
+}
+
+/** All three defense questions in ONE model call, so the dialog loads fast
+ * and each submit can advance instantly with no network in between. */
+export async function allQuestions(args: {
+  problemTitle: string;
+  statement: string;
+  code: string;
+  fnName: string;
+  traceSummary?: string;
+}): Promise<{ questions: [string, string, string]; engine: string }> {
+  const fallback = (): [string, string, string] => [
+    fallbackQuestion(0, args.problemTitle, args.code, args.fnName, [], args.traceSummary, "code"),
+    fallbackQuestion(1, args.problemTitle, args.code, args.fnName, [], args.traceSummary, "design"),
+    fallbackQuestion(2, args.problemTitle, args.code, args.fnName, [], args.traceSummary, "prompts"),
+  ];
+  const traceLine = args.traceSummary ? ` Candidate trace: ${args.traceSummary}.` : "";
+  const live = await callMeta([
+    {
+      role: "system",
+      content:
+        "You are Codelit's interrogator. Write exactly THREE short defense questions about the candidate's own solution, one per lens, in this order: (1) code — a QUOTED excerpt from their solution they must explain or trace; (2) design — complexity, trade-offs, scaling limits; (3) prompts — which prompt or decision in their trace shaped the solution." +
+        " Reference the candidate's actual code lines." + (args.traceSummary ? " Reference their trace (prompts, reverts, decision points)." : "") +
+        " Each question: short sentences, plain words, ONE question, any quoted code in its own fenced block. Questions must be personalized so a generic pasted AI answer does not fit." +
+        ' Reply exactly as JSON: {"questions": ["q1", "q2", "q3"]}. No preamble.',
+    },
+    {
+      role: "user",
+      content: `Problem: ${args.problemTitle}\n${args.statement}\nCandidate code:\n${args.code}${traceLine}\nWrite the three defense questions.`,
+    },
+  ], 3000, INTERROGATE_MODEL, 60_000);
+  if (live) {
+    try {
+      const parsed = JSON.parse(live.slice(live.indexOf("{"), live.lastIndexOf("}") + 1));
+      const qs = Array.isArray(parsed.questions) ? parsed.questions.filter((q: unknown) => typeof q === "string" && q.trim()) : [];
+      if (qs.length === 3) return { questions: [qs[0], qs[1], qs[2]] as [string, string, string], engine: INTERROGATE_MODEL };
+    } catch { /* fall through to deterministic questions */ }
+  }
+  return { questions: fallback(), engine: "offline" };
+}
+
+/** Grade all three answers in ONE model call at the end of the defense. */
+export async function gradeAll(args: {
+  items: { question: string; answer: string }[];
+  code: string;
+  traceSummary?: string;
+}): Promise<{ grades: { score: number; feedback: string }[]; engine: string }> {
+  const traceLine = args.traceSummary ? `\nCandidate trace: ${args.traceSummary}` : "";
+  const qa = args.items.map((it, i) => `Q${i + 1}: ${it.question}\nA${i + 1}: ${it.answer}`).join("\n\n");
+  const live = await callMeta([
+    {
+      role: "system",
+      content:
+        'Grade each coding-defense answer 0-10 for specificity to the candidate code. Generic answers that fit any solution score <=4.' +
+        (args.traceSummary ? " Reward answers that accurately reference their own trace (reverts, decision points)." : "") +
+        ' Reply exactly as JSON: {"grades": [{"score": number, "feedback": "one sentence"}, ...]} with one entry per question, in order. No preamble.',
+    },
+    { role: "user", content: `Candidate code:\n${args.code}${traceLine}\n\n${qa}` },
+  ], 3000, INTERROGATE_MODEL, 60_000);
+  if (live) {
+    try {
+      const parsed = JSON.parse(live.slice(live.indexOf("{"), live.lastIndexOf("}") + 1));
+      const gs = Array.isArray(parsed.grades) ? parsed.grades : [];
+      if (gs.length === args.items.length) {
+        return {
+          grades: gs.map((g: { score?: unknown; feedback?: unknown }) => ({
+            score: Math.max(0, Math.min(10, Number(g?.score) || 0)),
+            feedback: String(g?.feedback || ""),
+          })),
+          engine: INTERROGATE_MODEL,
+        };
+      }
+    } catch { /* fall through */ }
+  }
+  return {
+    grades: args.items.map((it, i) => fallbackGrade(it.answer, i, args.code, args.traceSummary)),
+    engine: "offline",
+  };
 }
 
 export async function gradeAnswer(args: {

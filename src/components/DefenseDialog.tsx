@@ -40,13 +40,14 @@ export default function DefenseDialog(props: DefenseDialogProps) {
   const { open, onClose } = props;
   const [started, setStarted] = useState(false);
   const [round, setRound] = useState(0);
-  const [question, setQuestion] = useState("");
+  const [questions, setQuestions] = useState<string[]>([]);
   const [answer, setAnswer] = useState("");
   const [pasted, setPasted] = useState(0);
   const [secondsLeft, setSecondsLeft] = useState(DEFEND_SECONDS);
   const [loading, setLoading] = useState(false);
   const [grading, setGrading] = useState(false);
   const [turns, setTurns] = useState<DefenseTurn[]>([]);
+  const question = questions[round] || "";
   const [error, setError] = useState("");
   const [verdict, setVerdict] = useState<ReturnType<typeof finalScore> | null>(null);
   const savedRef = useRef(false);
@@ -55,15 +56,24 @@ export default function DefenseDialog(props: DefenseDialogProps) {
   // The parent mounts this dialog fresh on every open, so the initial
   // state below is always a clean defense — no reset effect needed.
 
+  // Prefetch the three questions as soon as the dialog opens, so they are
+  // ready by the time the user reads the intro and clicks Start.
   useEffect(() => {
-    if (!open || !started || verdict) return;
+    if (open && questions.length === 0 && !loading && !verdict) void fetchQuestions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open ]);
+
+  useEffect(() => {
+    if (!open || !started || verdict || !question) return;
     timerRef.current = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [open, started, verdict, round]);
+  }, [open, started, verdict, round, question]);
 
-  async function fetchQuestion(r: number, hist: DefenseTurn[]) {
+  // All three questions arrive in ONE call up front; submits after that
+  // are instant and local, and grading happens once at the end.
+  async function fetchQuestions() {
     setLoading(true);
     setError("");
     try {
@@ -71,14 +81,11 @@ export default function DefenseDialog(props: DefenseDialogProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "question",
-          round: r,
-          lens: LENSES[r],
+          action: "questions",
           problemTitle: props.problemTitle,
           statement: props.statement,
           code: props.code,
           fnName: props.fnName,
-          history: hist.map((t) => ({ question: t.question, answer: t.answer })),
           traceSummary: props.traceSummary,
         }),
       });
@@ -87,8 +94,9 @@ export default function DefenseDialog(props: DefenseDialogProps) {
         setError(typeof data.error === "string" ? data.error : `Server error ${res.status}`);
         return;
       }
-      setQuestion(typeof data.question === "string" && data.question ? data.question : "Explain your solution.");
-      setRound(r);
+      const qs = Array.isArray(data.questions) ? data.questions.filter((q: unknown) => typeof q === "string" && q) : [];
+      setQuestions(qs.length === LENSES.length ? qs : LENSES.map(() => "Explain your solution."));
+      setRound(0);
       setAnswer("");
       setPasted(0);
       setSecondsLeft(DEFEND_SECONDS);
@@ -99,19 +107,16 @@ export default function DefenseDialog(props: DefenseDialogProps) {
     }
   }
 
-  async function submitAnswer(timedOut = false) {
-    if (grading || loading || !question) return;
+  async function gradeFinal(next: DefenseTurn[]) {
     setGrading(true);
-    const used = DEFEND_SECONDS - secondsLeft;
+    setError("");
     try {
       const res = await fetch("/api/interrogate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "grade",
-          round,
-          question,
-          answer: timedOut && !answer ? "(no answer — time expired)" : answer,
+          action: "gradeAll",
+          items: next.map((t) => ({ question: t.question, answer: t.answer })),
           code: props.code,
           traceSummary: props.traceSummary,
         }),
@@ -121,33 +126,51 @@ export default function DefenseDialog(props: DefenseDialogProps) {
         setError(typeof data.error === "string" ? data.error : `Server error ${res.status}`);
         return;
       }
-      const turn: DefenseTurn = {
-        question,
-        answer: answer || "(blank)",
-        score: typeof data.score === "number" ? data.score : 0,
-        feedback: typeof data.feedback === "string" ? data.feedback : "",
-        secondsUsed: used,
-        pastedChars: pasted,
-        engine: typeof data.engine === "string" ? data.engine : "unknown",
-      };
-      const next = [...turns, turn];
-      setTurns(next);
-      if (round + 1 < LENSES.length) {
-        await fetchQuestion(round + 1, next);
-      } else {
-        const total = next.reduce((s, t) => s + t.score, 0);
-        const r = finalScore({
-          passedCount: props.passedCount,
-          totalCount: props.totalCount,
-          traceScore0_100: props.traceScore0_100,
-          defendTotal0_30: total,
-        });
-        setVerdict(r);
-      }
+      const grades = Array.isArray(data.grades) ? data.grades : [];
+      const engine = typeof data.engine === "string" ? data.engine : "unknown";
+      const graded = next.map((t, i) => ({
+        ...t,
+        score: typeof grades[i]?.score === "number" ? grades[i].score : 0,
+        feedback: typeof grades[i]?.feedback === "string" ? grades[i].feedback : "",
+        engine,
+      }));
+      setTurns(graded);
+      const total = graded.reduce((s, t) => s + t.score, 0);
+      setVerdict(finalScore({
+        passedCount: props.passedCount,
+        totalCount: props.totalCount,
+        traceScore0_100: props.traceScore0_100,
+        defendTotal0_30: total,
+      }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setGrading(false);
+    }
+  }
+
+  // Submit is local and instant: record the answer, advance or finish.
+  function submitAnswer(timedOut = false) {
+    if (grading || loading || !question) return;
+    const turn: DefenseTurn = {
+      question,
+      answer: timedOut && !answer ? "(no answer — time expired)" : answer || "(blank)",
+      score: 0,
+      feedback: "",
+      secondsUsed: DEFEND_SECONDS - secondsLeft,
+      pastedChars: pasted,
+      engine: "",
+    };
+    const next = [...turns, turn];
+    setTurns(next);
+    setError("");
+    if (round + 1 < LENSES.length) {
+      setRound(round + 1);
+      setAnswer("");
+      setPasted(0);
+      setSecondsLeft(DEFEND_SECONDS);
+    } else {
+      void gradeFinal(next);
     }
   }
 
@@ -226,8 +249,8 @@ export default function DefenseDialog(props: DefenseDialogProps) {
             <div>
               <p className="text-sm leading-7 text-[#c9cec0]">Three timed questions about <span className="font-semibold text-[#e8eadf]">your</span> solution — a code excerpt, a design choice, and the prompts behind it. You get {DEFEND_SECONDS} seconds per question; the clock auto-submits at zero.</p>
               <p className="mt-2 text-xs leading-6 text-[#929b83]">Your defense banks the final score and lands on your passport. Answer all three questions to finish — the dialog stays until your verdict.</p>
-              <button disabled={loading} onClick={() => { setStarted(true); void fetchQuestion(0, []); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#e8b33d] px-5 py-2.5 text-xs font-semibold text-[#17190e] transition hover:bg-[#f0c15d] disabled:cursor-not-allowed disabled:opacity-40">
-                {loading ? <><LoaderCircle size={14} className="animate-spin" /> Preparing…</> : <>Start defense <ArrowRight size={13} /></>}
+              <button disabled={loading || (questions.length === 0 && !error)} onClick={() => { setStarted(true); if (questions.length === 0) void fetchQuestions(); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[#e8b33d] px-5 py-2.5 text-xs font-semibold text-[#17190e] transition hover:bg-[#f0c15d] disabled:cursor-not-allowed disabled:opacity-40">
+                {loading || questions.length === 0 ? <><LoaderCircle size={14} className="animate-spin" /> Preparing questions…</> : <>Start defense <ArrowRight size={13} /></>}
               </button>
             </div>
           )}
@@ -236,7 +259,11 @@ export default function DefenseDialog(props: DefenseDialogProps) {
             <p role="status" className="flex items-center gap-2 text-sm text-[#a5a997]"><LoaderCircle size={16} className="animate-spin" /> Preparing your question…</p>
           )}
 
-          {started && !verdict && question && (
+          {started && !verdict && grading && (
+            <p role="status" className="flex items-center gap-2 text-sm text-[#a5a997]"><LoaderCircle size={16} className="animate-spin" /> Grading your three answers…</p>
+          )}
+
+          {started && !verdict && !grading && question && (
             <div>
               <p className="flex items-center gap-2 text-xs font-semibold text-[#e8b33d]"><Timer size={13} /> {secondsLeft}s left{secondsLeft === 0 ? " — submitting…" : ""}</p>
               <div className="mt-1 h-1 overflow-hidden rounded bg-white/10"><div className="h-full bg-[#e8b33d] transition-all" style={{ width: `${(secondsLeft / DEFEND_SECONDS) * 100}%` }} /></div>
@@ -259,7 +286,7 @@ export default function DefenseDialog(props: DefenseDialogProps) {
                   {grading ? <><LoaderCircle size={13} className="animate-spin" /> Grading…</> : <>Submit answer <ArrowRight size={12} /></>}
                 </button>
               </div>
-              {error && <button disabled={loading} onClick={() => void fetchQuestion(round, turns)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#34372e] px-3 py-2 text-xs text-[#d9dbd0] transition hover:bg-white/5">Retry question</button>}
+              {error && <button disabled={loading || grading} onClick={() => { if (turns.length >= LENSES.length) void gradeFinal(turns); else void fetchQuestions(); }} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#34372e] px-3 py-2 text-xs text-[#d9dbd0] transition hover:bg-white/5">{turns.length >= LENSES.length ? "Retry grading" : "Retry questions"}</button>}
             </div>
           )}
 
