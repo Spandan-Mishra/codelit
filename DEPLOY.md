@@ -96,6 +96,41 @@ Never click **Upgrade to Pay As You Go**. Create only resources labelled
    point a free DuckDNS subdomain at the IP and re-run
    `sudo bash deploy/setup-vm.sh your.domain` on the VM.
 
+## Automatic updates (GitHub Actions → Oracle)
+
+Every push to `master` runs `.github/workflows/deploy-oracle.yml`:
+
+1. Verify: install, lint, TypeScript, connector tests, production build.
+2. Deploy: SSH to the VM with a dedicated key restricted to one forced
+   command, `sudo /opt/codelit/deploy/deploy.sh`.
+3. The server script pulls `origin/master`, backs up `data/` to
+   `/var/backups/codelit` (14 days), installs dependencies when the
+   lockfile changed, stops the service, builds, restarts, checks
+   `/api/health`, runs a Python execution canary, and rolls back to the
+   previous commit if any step fails.
+4. GitHub checks the public `/api/health` endpoint from outside.
+
+Required GitHub repository secrets: `ORACLE_HOST`, `ORACLE_USER`,
+`ORACLE_SSH_KEY` (the dedicated deploy private key), and
+`ORACLE_KNOWN_HOSTS`. Never put the personal `codelit_oracle` key in
+GitHub.
+
+One-time forced-key setup on the VM (after `deploy/deploy.sh` exists in
+`/opt/codelit`): append the dedicated deploy public key to
+`~/.ssh/authorized_keys` in this form, then `chmod 600`:
+
+```text
+command="/usr/bin/sudo /opt/codelit/deploy/deploy.sh",no-agent-forwarding,no-port-forwarding,no-X11-forwarding ssh-ed25519 <KEY> codelit-github-deploy
+```
+
+Builds take ~4–5 min on this VM (1 GB RAM + swap), and the service is
+stopped during the build, so automatic deploys briefly take the site
+offline. Manual emergency update (the same script):
+
+```bash
+ssh -i ~/.ssh/codelit_oracle ubuntu@130.210.6.147 'sudo bash /opt/codelit/deploy/deploy.sh'
+```
+
 ## Plan C — alternative if A and B both fail: your own machine + tunnel
 
 This is the verified-working fallback, not a compromise demo: the app
@@ -118,8 +153,7 @@ cloudflared tunnel --url http://localhost:3000   # free, no card, no account for
 
 ## Hackathon submission checklist
 
-- [ ] **Repo is public** — currently `PRIVATE`, which fails the rules.
-      `gh repo edit Spandan-Mishra/codelit --visibility public`
+- [x] **Repo is public** — verified with `gh repo view` (Nov 4).
       `.env.local` is gitignored and no key exists in git history
       (verified Nov 3); still, rotate `MODEL_API_KEY` after the event.
 - [ ] Live URL passes the canary + one full Practice → Defend flow.

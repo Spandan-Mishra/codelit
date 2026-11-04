@@ -1,0 +1,89 @@
+name: Deploy to Oracle
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-oracle
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Connector tests
+        run: npm --prefix connector test
+
+      - name: Production build
+        run: npm run build
+
+  deploy:
+    name: Deploy Oracle VM
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: production
+    steps:
+      - name: Install dedicated deploy key
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.ORACLE_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/codelit_deploy
+          chmod 600 ~/.ssh/codelit_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Run server-side deploy
+        env:
+          DEPLOY_HOST: ${{ secrets.ORACLE_HOST }}
+          DEPLOY_USER: ${{ secrets.ORACLE_USER }}
+        run: |
+          # The key is restricted by a forced command on the VM, so SSH
+          # needs no remote command: connecting runs deploy/deploy.sh,
+          # which pulls this exact pushed commit, rebuilds, restarts,
+          # health-checks, and rolls back on failure.
+          ssh -i ~/.ssh/codelit_deploy \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=30 \
+            "$DEPLOY_USER@$DEPLOY_HOST"
+
+      - name: External health check
+        env:
+          DEPLOY_HOST: ${{ secrets.ORACLE_HOST }}
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 15 "http://$DEPLOY_HOST:3000/api/health"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Production health check failed" >&2
+          exit 1
