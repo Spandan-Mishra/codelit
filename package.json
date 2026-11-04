@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "node scripts/start-production.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:connector": "npm --prefix connector test",
+    "test:containment": "node scripts/execution-containment-check.mjs",
+    "check": "npm run lint && npx tsc --noEmit && npm run build"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

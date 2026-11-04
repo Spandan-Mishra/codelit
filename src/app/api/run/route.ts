@@ -6,7 +6,15 @@ import { runPython, runJs, runCpp, isExecutionUnavailable } from "@/lib/exec";
 import type { TestCase } from "@/lib/types";
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ results: [], error: "Invalid JSON body.", engine: "none" }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ results: [], error: "Invalid JSON body.", engine: "none" }, { status: 400 });
+  }
   const { language, code, fnName, tests, problemId, cppReturn } = body as {
     language: "python" | "javascript" | "c++";
     code: string;
@@ -19,7 +27,16 @@ export async function POST(req: Request) {
   if (limited(`run:${clientIp(req)}`, 30)) {
     return NextResponse.json({ results: [], error: "Rate limited — wait a minute.", engine: "limited" }, { status: 429 });
   }
-  if (!code || !fnName || !Array.isArray(tests)) return NextResponse.json({ results: [], error: "Missing code/tests", engine: "none" }, { status: 400 });
+  if (
+    !code || typeof code !== "string" || !fnName || typeof fnName !== "string" ||
+    !Array.isArray(tests) ||
+    tests.some((t) => !t || typeof t !== "object" || typeof t.input !== "string" || typeof t.expected !== "string")
+  ) {
+    return NextResponse.json({ results: [], error: "Missing or malformed code/tests", engine: "none" }, { status: 400 });
+  }
+  if (!["python", "javascript", "c++"].includes(language)) {
+    return NextResponse.json({ results: [], error: "Unknown language.", engine: "none" }, { status: 400 });
+  }
   if (code.length > 20_000 || tests.length > 10) {
     return NextResponse.json({ results: [], error: "Payload too large (max 20k code chars, 10 tests).", engine: "none" }, { status: 413 });
   }

@@ -40,7 +40,12 @@ export async function POST(req: Request) {
   if (limited(`leaderboard:${ip}`, 10)) {
     return NextResponse.json({ error: "Rate limited — wait a minute." }, { status: 429 });
   }
-  const body = asRecord(await req.json());
+  let body: Record<string, unknown>;
+  try {
+    body = asRecord(await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
   if (body.action !== "submit") {
     return NextResponse.json({ error: "Unknown action." }, { status: 400 });
   }

@@ -14,13 +14,24 @@ export async function POST(req: Request) {
   if (limited(`interrogate:${clientIp(req)}`, 40)) {
     return NextResponse.json({ error: "Rate limited — wait a minute." }, { status: 429 });
   }
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   const code = String(body.code || "");
   if (code.length > MAX_CODE) return NextResponse.json({ error: "Code too long — keep it under 12k characters." }, { status: 413 });
-  const problem = body.problemId ? getProblem(body.problemId) : undefined;
+  const problem = typeof body.problemId === "string" ? getProblem(body.problemId) : undefined;
   const traceSummary = typeof body.traceSummary === "string" && body.traceSummary ? body.traceSummary.slice(0, 300) : undefined;
   if (body.action === "question") {
-    const history = (Array.isArray(body.history) ? body.history : []).slice(-MAX_HISTORY);
+    const history = (Array.isArray(body.history) ? body.history : [])
+      .filter((h): h is { question: string; answer: string } =>
+        Boolean(h) && typeof h === "object" &&
+        typeof (h as { question?: unknown }).question === "string" &&
+        typeof (h as { answer?: unknown }).answer === "string")
+      .slice(-MAX_HISTORY);
     const lensRaw = String(body.lens || "");
     const lens = lensRaw === "code" || lensRaw === "design" || lensRaw === "prompts" ? lensRaw : undefined;
     const out = await nextQuestion({
