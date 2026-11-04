@@ -69,7 +69,8 @@ systemctl restart codelit
 
 # Oracle Cloud Ubuntu images ship a host iptables REJECT rule: opening a
 # port in the Security List alone is not enough. Open it here too.
-for port in 22 80 443 3000; do
+# Port 3000 stays closed publicly: Caddy (443) is the only app ingress.
+for port in 22 80 443; do
   # Oracle's REJECT rule sits at line 5; inserting at 6 lands below it and
   # never matches. Always insert above it.
   iptables -C INPUT -m state --state NEW -p tcp --dport "$port" -j ACCEPT 2>/dev/null \

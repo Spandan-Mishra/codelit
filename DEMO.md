@@ -1,6 +1,6 @@
 # Codelit — 3-minute demo script
 
-**Live URL:** http://130.210.6.147:3000
+**Live URL:** https://codelit.duckdns.org
 
 Prepare before recording: sign in with a browser profile that already has
 five practice scenarios passed (so Ranked is unlocked), keep a second

@@ -1,6 +1,6 @@
 # Codelit — prove how you work with AI
 
-**Live product:** http://130.210.6.147:3000
+**Live product:** https://codelit.duckdns.org
 
 Codelit is an AI-first coding assessment platform built for a world where
 every candidate already has an agent. It does not try to stop people using
@@ -70,8 +70,10 @@ single-use and expire after ten minutes. The connector keeps your
 provider login on your machine; Codelit receives a revocable device
 credential, prompts, tool activity, and solution-file revisions.
 
-Codex solving is supported today. A Claude CLI installation can be
-detected, but Claude solving through this connector is not enabled yet.
+Codex and Muse Code solving are both supported: select the provider in
+the agent panel, sign in with `codex login` or
+`codelit-connect login --provider muse`, and pick any model your agent
+reports from the model dropdown.
 
 ## Local development
 

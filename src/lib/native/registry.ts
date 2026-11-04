@@ -24,6 +24,12 @@ import {
 
 export const NATIVE_SESSION_COOKIE = "codelit_sid";
 
+/** Session cookie header value; Secure whenever the browser reached us over HTTPS (directly or via the trusted proxy's forwarded proto). */
+export function sessionCookie(req: Request, signed: string): string {
+  const https = req.headers.get("x-forwarded-proto") === "https" || new URL(req.url).protocol === "https:";
+  return `${NATIVE_SESSION_COOKIE}=${encodeURIComponent(signed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${https ? "; Secure" : ""}`;
+}
+
 export function newBrowserSession(): { id: string; signed: string } {
   const id = randomBytes(12).toString("hex");
   return { id, signed: signSession(id) };

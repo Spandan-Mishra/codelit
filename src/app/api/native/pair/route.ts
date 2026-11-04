@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { limited, clientIp } from "@/lib/ratelimit";
 import {
-  NATIVE_SESSION_COOKIE,
+  sessionCookie,
   bindTicket,
   claimTicket,
   getDevice,
@@ -17,11 +17,8 @@ import {
 } from "@/lib/native/registry";
 import { cleanAdapters } from "@/lib/native/devices";
 
-function withSessionCookie(res: NextResponse, signed: string): NextResponse {
-  res.headers.append(
-    "Set-Cookie",
-    `${NATIVE_SESSION_COOKIE}=${encodeURIComponent(signed)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`
-  );
+function withSessionCookie(res: NextResponse, signed: string, req: Request): NextResponse {
+  res.headers.append("Set-Cookie", sessionCookie(req, signed));
   return res;
 }
 
@@ -48,7 +45,7 @@ export async function POST(req: Request) {
     }
     const t = issueTicket(sessionId);
     const res = NextResponse.json({ ticketId: t.ticketId, code: t.code, expiresAt: t.expiresAt });
-    if (setCookie) withSessionCookie(res, setCookie);
+    if (setCookie) withSessionCookie(res, setCookie, req);
     return res;
   }
 

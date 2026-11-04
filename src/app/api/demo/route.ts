@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { limited, clientIp } from "@/lib/ratelimit";
-import { NATIVE_SESSION_COOKIE } from "@/lib/native/registry";
 import { verifySession } from "@/lib/native/secret";
+import { sessionCookie } from "@/lib/native/registry";
 
 // Demo entry links. Codelit has no passwords: identity is the signed
 // browser-session cookie. A demo link carries one prepared session's
@@ -23,9 +23,6 @@ export function GET(req: Request) {
   // Relative Location: the app is served on a bare IP:port internally, so
   // req.url's origin can be localhost — never leak that to the browser.
   const res = new NextResponse(null, { status: 302, headers: { Location: target } });
-  res.headers.append(
-    "Set-Cookie",
-    `${NATIVE_SESSION_COOKIE}=${encodeURIComponent(sid)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`
-  );
+  res.headers.append("Set-Cookie", sessionCookie(req, sid));
   return res;
 }
