@@ -161,15 +161,17 @@ export async function resume(threadId, { cwd, model } = {}) {
   return { nativeSessionId: threadId, model: s.model };
 }
 
+// Starts the turn and returns as soon as the process is spawned — exactly
+// like the Codex adapter. Completion streams through onEvent. Awaiting the
+// full exec here would block the connector's poll loop past its lease
+// deadline and get the connector shut down mid-turn.
 export async function turn(threadId, text, { turnId, model } = {}) {
   const s = sessions().get(threadId);
   if (!s) throw new Error("Muse native session is closed; reconnect before sending a turn");
   if (s.state === "running") throw new Error("Muse already has an active turn");
-  s.turnId = turnId;
   s.model = model || s.model;
-  s.text = "";
-  s.started = false;
-  s.terminal = false;
+  const active = { turnId, text: "", started: false, terminal: false, interrupted: false };
+  s.active = active;
   s.state = "running";
   const args = ["exec", "--json", "--trust-workspace", "--workspace", s.cwd, ...(s.model ? ["--model", s.model] : []), text];
   await new Promise((resolve, reject) => {
@@ -182,12 +184,8 @@ export async function turn(threadId, text, { turnId, model } = {}) {
     s.child = child;
     let buffer = "";
     let stderr = "";
-    const finish = (err) => {
-      s.child = null;
-      s.state = "idle";
-      s.turnId = null;
-      if (err) reject(err); else resolve();
-    };
+    let spawned = false;
+    child.on("spawn", () => { spawned = true; resolve(); });
     child.stdout.on("data", (chunk) => {
       buffer += chunk.toString("utf8");
       let idx;
@@ -197,23 +195,29 @@ export async function turn(threadId, text, { turnId, model } = {}) {
         if (!line) continue;
         try {
           const record = JSON.parse(line);
-          for (const [type, payload] of mapRecord(s, record)) ev(s, type, payload, turnId);
+          for (const [type, payload] of mapRecord(active, record)) ev(s, type, payload, turnId);
         } catch { /* non-JSON noise on stdout is not an event */ }
       }
     });
     child.stderr.on("data", (chunk) => { stderr = (stderr + chunk.toString("utf8")).slice(-2000); });
-    child.on("error", (err) => finish(new Error(`Could not start Muse: ${err.message}`)));
+    child.on("error", (err) => {
+      if (!spawned) { s.state = "idle"; s.active = null; s.child = null; reject(new Error(`Could not start Muse: ${err.message}`)); }
+    });
     child.on("close", (code) => {
-      if (s.child !== child && s.child !== null) return;
-      if (!s.terminal) {
-        if (code === 0 && s.text) {
-          ev(s, "message.final", { text: s.text }, turnId);
-          ev(s, "turn.completed", { status: "completed" }, turnId);
-        } else {
-          ev(s, "turn.failed", { error: stderr.trim() ? "Muse exited without completing the turn. Check `muse login` and model access." : "Muse exited without completing the turn; check local authentication, model access and CLI configuration." }, turnId);
-        }
+      if (s.active !== active) return; // close() already settled this turn
+      s.active = null;
+      s.child = null;
+      s.state = s.state === "closed" ? "closed" : "idle";
+      if (active.terminal) return;
+      active.terminal = true;
+      if (active.interrupted) {
+        ev(s, "turn.interrupted", { reason: "interrupted by user" }, turnId);
+      } else if (code === 0 && active.text) {
+        ev(s, "message.final", { text: active.text }, turnId);
+        ev(s, "turn.completed", { status: "completed" }, turnId);
+      } else {
+        ev(s, "turn.failed", { error: stderr.trim() ? "Muse exited without completing the turn. Check `muse login` and model access." : "Muse exited without completing the turn; check local authentication, model access and CLI configuration." }, turnId);
       }
-      finish(null);
     });
   });
 }
@@ -230,6 +234,7 @@ function killChild(s, signal) {
 export async function interrupt(threadId) {
   const s = sessions().get(threadId);
   if (!s || s.state !== "running") return;
+  if (s.active) s.active.interrupted = true;
   killChild(s, "SIGINT");
   setTimeout(() => killChild(s, "SIGTERM"), 1500).unref?.();
 }
@@ -247,9 +252,14 @@ export async function close(threadId) {
   const s = sessions().get(threadId);
   if (!s) return;
   if (s.child) {
+    const active = s.active;
     killChild(s, "SIGTERM");
     s.child = null;
-    if (s.turnId) ev(s, "turn.failed", { completion: "unknown", error: "Native session closed before confirmed turn completion." }, s.turnId);
+    if (active && !active.terminal) {
+      active.terminal = true;
+      ev(s, "turn.failed", { completion: "unknown", error: "Native session closed before confirmed turn completion." }, active.turnId);
+    }
+    s.active = null;
   }
   s.state = "closed";
   sessions().delete(threadId);

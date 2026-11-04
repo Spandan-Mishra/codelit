@@ -52,3 +52,46 @@ const signedIn = createDiscovery({ detectRuntime: async () => ({ found: true, ve
 assert.equal((await signedIn()).status, "ready");
 
 console.log("muse adapter: discovery ok");
+
+// --- turn() must return promptly (like the Codex adapter): the connector
+// poll loop awaits it, and a blocking turn starves lease renewal, which
+// kills the connector mid-turn ("Native session closed before confirmed
+// turn completion"). Regression test with a fake slow `muse` CLI. ---
+{
+  const { mkdtempSync, writeFileSync, chmodSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const bin = mkdtempSync(join(tmpdir(), "fake-muse-bin-"));
+  const ws = mkdtempSync(join(tmpdir(), "fake-muse-ws-"));
+  writeFileSync(join(bin, "muse"), `#!/bin/sh
+if [ "$1" = "--version" ]; then echo "Muse 0.0-test"; exit 0; fi
+sleep 2
+echo '{"payload_type":"run.lifecycle.started","payload":{}}'
+echo '{"payload_type":"run.output.delta","payload":{"text":"hi"}}'
+echo '{"payload_type":"run.terminal.completed","payload":{"text":"hi"}}'
+`);
+  chmodSync(join(bin, "muse"), 0o755);
+  const prevPath = process.env.PATH;
+  process.env.PATH = `${bin}:${prevPath}`;
+  try {
+    const adapter = await import("../lib/muse.mjs");
+    const seen = [];
+    adapter.onEvent((e) => seen.push(e.type));
+    const s = await adapter.start({ cwd: ws, model: null });
+    const t0 = Date.now();
+    await adapter.turn(s.nativeSessionId, "work", { turnId: "t-slow" });
+    const elapsed = Date.now() - t0;
+    assert.ok(elapsed < 1000, `turn() blocked for ${elapsed}ms; it must return after starting the turn`);
+    assert.equal(adapter.state(s.nativeSessionId), "running");
+    const deadline = Date.now() + 8000;
+    while (!seen.includes("turn.completed") && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.ok(seen.includes("turn.completed"), `expected turn.completed, saw: ${seen.join(",")}`);
+    assert.equal(adapter.state(s.nativeSessionId), "idle");
+    await adapter.close(s.nativeSessionId);
+    console.log("muse adapter: non-blocking turn ok");
+  } finally {
+    process.env.PATH = prevPath;
+  }
+}
