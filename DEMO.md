@@ -1,42 +1,62 @@
-# Codelit demo video — 2-minute script
+# Codelit — 3-minute demo script
 
-Record against the deployed URL, not localhost. One continuous screen
-capture with voiceover; captions for every timer and score.
+**Live URL:** http://130.210.6.147:3000
 
-## 0:00–0:20 — The problem (landing page)
+Prepare before recording: sign in with a browser profile that already has
+five practice scenarios passed (so Ranked is unlocked), keep a second
+profile or the attempts list ready for the practice view, and have
+`codelit-connect run` ready on the demo machine. Never show API keys,
+pairing secrets, or the raw data directory.
 
-Show the landing page. Say: "A screenshot and an AI model solve any
-static coding problem. Green ticks prove nothing anymore. Codelit asks
-for proof instead."
+## 0:00–0:25 — The problem
 
-## 0:20–0:50 — Solve (Two Sum, Practice)
+> "LeetCode grades what you paste. A photo and an AI model paste perfectly,
+> so the green tick proves nothing. Codelit grades what a photo cannot
+> produce: how you direct an agent, and whether you can defend its code."
 
-Open Practice → Two Sum. Paste a correct solution into the editor
-(deliberately paste — say so out loud). Run tests: all pass, including
-hidden. Say: "Cheating the code is allowed. Watch what happens next."
+Show the landing page and the Practice / Ranked explainer.
 
-## 0:50–1:30 — Defend (the part that breaks cheating)
+## 0:25–0:55 — Practice and the gate
 
-Click "Defend your solution". Answer round 1 from memory, then let the
-90-second timer pressure show on a mutation round. Show the score:
-generic answers score low. Say: "Three timed rounds quote your own
-lines and flip them. A pasted answer can't survive this — knowing it
-is faster than re-prompting around it."
+Open **Scenarios → Practice**. Point at a blurb with its worked sample.
 
-## 1:30–1:50 — Debug Under Fire + Arena lock
+> "Practice is repeatable and unscored. You learn the staged system here.
+> Ranked stays locked until you pass five different practice scenarios."
 
-Quick cut: a debug challenge with the countdown and prompt budget, then
-the Arena page. Say: "Practice repeats forever. Graded problems lock
-after one defended attempt — like an interview."
+Switch to **Ranked** and show the unlocked state.
 
-## 1:50–2:00 — Passport close
+## 0:55–1:45 — Solve with your agent
 
-Open the Passport with the credibility score. Say: "Not green ticks —
-defended traces. That's Codelit."
+Start a ranked scenario and show the three panels: released requirements,
+captured agent conversation, and the prompt box.
 
-## Checklist before recording
+> "The platform never hands the brief to my agent. I have to explain the
+> task. Every prompt and file change is captured automatically, and the
+> requirements tighten across three stages."
 
-- Deployed URL loads cold in under 5 seconds
-- One full Practice defense completes without errors
-- Passport shows at least one defended score
-- No API keys or terminal windows visible in frame
+Send one real prompt, show the agent writing `solution.py`, then run the
+visible checks and unlock the next stage.
+
+## 1:45–2:15 — Finish and hidden acceptance
+
+Click **Finish & evaluate**. Show the frozen snapshot result.
+
+> "Finishing freezes a hash-bound snapshot. Hidden acceptance tests run
+> server-side; I only ever see how many passed, never the hidden cases."
+
+## 2:15–2:50 — Defend the trace
+
+Click **Finish & proceed to defense**. Answer at least one question live.
+
+> "Now I defend my exact code: a quoted line, a design trade-off, and the
+> prompts behind the run — ninety seconds each. This is graded by Meta's
+> Muse Spark model, and it is the part you cannot copy from a screenshot."
+
+Show the verdict, score breakdown, and tier.
+
+## 2:50–3:00 — Passport close
+
+Open **Passport**.
+
+> "Defended runs bank here. Not a green tick — a credibility record.
+> Codelit doesn't ban AI. It makes cheating pointless."

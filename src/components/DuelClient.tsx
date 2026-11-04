@@ -31,7 +31,7 @@ export default function DuelClient(props: {
   cppReturn?: string;
   duelDifficulty: DifficultyKey;
   duelLabel: string;
-  duelModel: string;
+  duelPace: string;
   duelTargetSec: number;
   duelCost: number;
 }) {
@@ -110,7 +110,7 @@ export default function DuelClient(props: {
             <Swords className="h-4 w-4 text-[#e8b33d]" /> {props.duelLabel}
           </p>
           <p className="text-sm text-[#9a968c] mt-2 leading-6">
-            You + your agent vs a simulated house pace ({props.duelModel}). First green wins — the simulation solves in about{" "}
+            You + your agent vs a simulated house pace ({props.duelPace}). First green wins — the simulation solves in about{" "}
             {Math.round(props.duelTargetSec / 60)}m.
             {props.duelCost > 0 && <> Entry: {props.duelCost} credits.</>} Wins pay +2.
           </p>

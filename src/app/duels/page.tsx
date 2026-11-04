@@ -17,7 +17,7 @@ export default function DuelsPage() {
         </span>
       </div>
       <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">
-        You + your agent vs the house agent. First green wins, and wins pay +2 credits.
+        Race a simulated house pace. First green wins, and wins pay +2 credits.
       </p>
 
       <div className="grid gap-2.5 mt-6 sm:grid-cols-3">
@@ -35,7 +35,7 @@ export default function DuelsPage() {
                 {d.label}
               </p>
               <p className="text-xs text-[#9a968c] mt-1.5 leading-5">
-                {d.model} · solves in ~{Math.round(d.targetSolveSec / 60)}m
+                {d.pace} · solves in ~{Math.round(d.targetSolveSec / 60)}m
               </p>
               {d.locked ? (
                 <p className="text-xs text-[#8a877d] mt-2 leading-5">
@@ -87,7 +87,7 @@ export default function DuelsPage() {
 
       <div id="leaderboard" className="mt-10 scroll-mt-6">
         <h2 className="text-xl tracking-tight">Leaderboard</h2>
-        <p className="font-ui text-sm text-[#9a968c] mt-1">Top posted runs across scenarios.</p>
+        <p className="font-ui text-sm text-[#9a968c] mt-1">Self-reported runs posted by players. They are not server-verified; your passport is the defended record.</p>
         <Leaderboard scenarios={SCENARIOS.map((s) => ({ id: s.id, title: s.title }))} />
       </div>
     </div>

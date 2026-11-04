@@ -16,7 +16,7 @@ export default function Home() {
           </p>
           <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row sm:flex-wrap gap-2.5 sm:gap-3 font-ui">
             <Link href="/scenarios" className="text-center px-5 py-2.5 rounded-md bg-[#e8b33d] text-black font-semibold text-sm hover:bg-[#f2c14e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Run a scenario</Link>
-            <Link href="/duels" className="text-center px-5 py-2.5 rounded-md border border-[#3a3c37] text-sm hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Duel the house agent</Link>
+            <Link href="/duels" className="text-center px-5 py-2.5 rounded-md border border-[#3a3c37] text-sm hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Race the house pace</Link>
           </div>
           <div className="mt-6 sm:mt-8 grid gap-2.5 sm:grid-cols-3 sm:gap-3 font-ui text-sm">
             <div className="rounded-lg border border-[#262824] bg-[#141613] p-4"><Timer className="h-5 w-5 text-[#e8b33d]" /><p className="mt-2 font-semibold">Timed runs</p><p className="text-[#9a968c] text-[13px] mt-1 leading-5">Prompt budgets and clocks beat copy-paste.</p></div>
@@ -62,7 +62,7 @@ export default function Home() {
       </section>
 
       <section className="py-8">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><h2 className="text-xl sm:text-2xl tracking-tight">Agent duels</h2><span className="font-ui text-xs text-[#9a968c]">you + your agent vs the house agent · first green wins</span></div>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1"><h2 className="text-xl sm:text-2xl tracking-tight">Agent duels</h2><span className="font-ui text-xs text-[#9a968c]">you + your agent vs a simulated house pace · first green wins</span></div>
         <p className="font-ui text-sm text-[#9a968c] mt-2 max-w-2xl leading-6">Watch its progress live while you work. Beat it to earn credits toward harder difficulties.</p>
         <Link href="/duels" className="inline-block mt-4 font-ui text-sm px-4 py-2 rounded-md border border-[#3a3c37] hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#e8b33d]">Open duels →</Link>
       </section>

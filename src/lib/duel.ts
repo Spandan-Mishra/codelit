@@ -8,7 +8,7 @@ export type DifficultyKey = "easy" | "medium" | "hard";
 
 export interface DifficultyConfig {
   label: string;
-  model: string;
+  pace: string;
   targetSolveSec: number;
   stepEverySec: number;
   cost: number;
@@ -18,7 +18,7 @@ export interface DifficultyConfig {
 export const DIFFICULTIES: Record<DifficultyKey, DifficultyConfig> = {
   easy: {
     label: "Easy Sparring",
-    model: "contributor tier, low effort",
+    pace: "Steady pace",
     targetSolveSec: 480,
     stepEverySec: 75,
     cost: 0,
@@ -26,7 +26,7 @@ export const DIFFICULTIES: Record<DifficultyKey, DifficultyConfig> = {
   },
   medium: {
     label: "Medium Sparring",
-    model: "contributor tier, high effort",
+    pace: "Fast pace",
     targetSolveSec: 300,
     stepEverySec: 50,
     cost: 3,
@@ -34,7 +34,7 @@ export const DIFFICULTIES: Record<DifficultyKey, DifficultyConfig> = {
   },
   hard: {
     label: "Hard Sparring",
-    model: "maintainer tier, high effort",
+    pace: "Relentless pace",
     targetSolveSec: 180,
     stepEverySec: 30,
     cost: 6,

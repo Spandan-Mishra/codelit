@@ -333,7 +333,7 @@ function SessionWorkspace({ attemptId }: { attemptId: string }) {
       <header>
         <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#929887]">
           <Link href="/native" className="inline-flex items-center gap-1.5 transition hover:text-[#e8b33d]"><ArrowLeft size={14} /> All attempts</Link>
-          <div className="flex flex-wrap items-center gap-3"><span className="font-code" title={attempt.id}>Attempt {attempt.id.slice(-8)}</span><span className="rounded-full border border-[#e8b33d]/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#d8b365]">Experimental</span></div>
+          <div className="flex flex-wrap items-center gap-3"><span className="font-code" title={attempt.id}>Attempt {attempt.id.slice(-8)}</span><span className="rounded-full border border-[#e8b33d]/30 px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#d8b365]">{isPractice ? "Practice" : "Ranked"}</span></div>
         </div>
         <div className="mt-5 flex flex-wrap items-start justify-between gap-4">
           <div><p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[#d6b461]">Solve with your agent</p><h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-[#eeeee6] sm:text-3xl">{scenario?.title || "Challenge workspace"}</h1><p className="mt-2 text-xs text-[#9ea48f]">{scenario?.difficulty && <span className="capitalize">{scenario.difficulty} · </span>}{attempt.language} · {scenario ? `${scenario.minutes} min target · ` : ""}{scenario?.tags.join(" / ")}</p></div>

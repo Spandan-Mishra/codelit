@@ -52,7 +52,7 @@ export default async function DuelPage({
       cppReturn={s.cppReturn}
       duelDifficulty={difficulty}
       duelLabel={d.label}
-      duelModel={d.model}
+      duelPace={d.pace}
       duelTargetSec={d.targetSolveSec}
       duelCost={d.cost}
     />
